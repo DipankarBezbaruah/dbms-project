@@ -1,0 +1,222 @@
+.security {
+  min-height: 100vh;
+  background: var(--cream);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ── Header ────────────────────────────────────── */
+.security__header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 28px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.security__back {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s;
+}
+
+.security__back:hover {
+  background: var(--cream);
+  color: var(--brown-800);
+}
+
+.security__brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.security__logo {
+  width: 30px;
+  height: 30px;
+  background: var(--terracotta);
+  border-radius: var(--radius-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.security__brand-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--brown-900);
+}
+
+.security__brand-sub {
+  font-size: 0.86rem;
+  color: var(--text-muted);
+}
+
+/* ── Main panel ────────────────────────────────── */
+.security__panel {
+  max-width: 460px;
+  width: 100%;
+  margin-top: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.security__icon-badge {
+  width: 64px;
+  height: 64px;
+  background: var(--terracotta);
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.security__title {
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: var(--brown-900);
+  margin-bottom: 6px;
+}
+
+.security__subtitle {
+  font-size: 0.93rem;
+  color: var(--text-muted);
+  margin-bottom: 32px;
+}
+
+/* ── Input ─────────────────────────────────────── */
+.security__input-group {
+  width: 100%;
+  text-align: left;
+  margin-bottom: 20px;
+}
+
+.security__input-label {
+  display: block;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--brown-800);
+  margin-bottom: 6px;
+}
+
+.security__input {
+  width: 100%;
+  padding: 14px 18px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  font-size: 1.14rem;
+  color: var(--text);
+  text-align: center;
+  transition: border-color 0.15s;
+}
+
+.security__input:focus {
+  outline: none;
+  border-color: var(--terracotta);
+  box-shadow: 0 0 0 3px var(--terracotta-bg);
+}
+
+.security__input::placeholder {
+  color: var(--brown-300);
+  font-size: 0.93rem;
+}
+
+/* Hide number spinner */
+.security__input::-webkit-inner-spin-button,
+.security__input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.security__input[type=number] {
+  -moz-appearance: textfield;
+}
+
+/* ── Alert ─────────────────────────────────────── */
+.security__alert {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-radius: var(--radius-sm);
+  font-size: 0.93rem;
+  font-weight: 500;
+  margin-bottom: 20px;
+}
+
+.security__alert--success {
+  background: var(--forest-bg);
+  color: var(--forest);
+  border: 1px solid var(--olive-light);
+}
+
+.security__alert--error {
+  background: var(--brick-bg);
+  color: var(--brick);
+  border: 1px solid #e0a0a0;
+}
+
+/* ── Buttons ───────────────────────────────────── */
+.security__buttons {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+.security__btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px 24px;
+  border-radius: var(--radius-sm);
+  font-size: 1.07rem;
+  font-weight: 700;
+  transition: all 0.15s ease;
+}
+
+.security__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.security__btn--exit {
+  background: var(--terracotta);
+  color: #fff;
+}
+
+.security__btn--exit:hover:not(:disabled) {
+  background: var(--terracotta-dark);
+}
+
+.security__btn--return {
+  background: var(--forest);
+  color: #fff;
+}
+
+.security__btn--return:hover:not(:disabled) {
+  background: var(--olive-dark);
+}
+
+.security__help {
+  font-size: 0.78rem;
+  color: var(--text-light);
+  max-width: 360px;
+}

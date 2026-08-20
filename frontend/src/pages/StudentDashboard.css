@@ -1,0 +1,268 @@
+/* ── Dashboard layout ──────────────────────────── */
+.dashboard {
+  display: flex;
+  min-height: 100vh;
+}
+
+.dashboard__main {
+  margin-left: var(--sidebar-width);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard__body {
+  display: flex;
+  flex: 1;
+}
+
+.dashboard__content {
+  flex: 1;
+  padding: 28px 32px;
+  background: var(--cream);
+  overflow-y: auto;
+}
+
+/* ── Student page ──────────────────────────────── */
+.student-page__heading {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--brown-900);
+  margin-bottom: 2px;
+}
+
+.student-page__subheading {
+  font-size: 0.86rem;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+/* ── Outpass form ──────────────────────────────── */
+.outpass-form {
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group--half {
+  flex: 1;
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+}
+
+.form-label {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--brown-800);
+}
+
+.form-input,
+.form-textarea {
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.93rem;
+  transition: border-color 0.15s;
+}
+
+.form-input:focus,
+.form-textarea:focus {
+  outline: none;
+  border-color: var(--terracotta);
+  box-shadow: 0 0 0 3px var(--terracotta-bg);
+}
+
+.form-input::placeholder,
+.form-textarea::placeholder {
+  color: var(--brown-300);
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* ── Buttons ───────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 24px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.93rem;
+  transition: all 0.15s ease;
+}
+
+.btn--primary {
+  background: var(--terracotta);
+  color: #fff;
+}
+
+.btn--primary:hover {
+  background: var(--terracotta-dark);
+}
+
+.btn--primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn--full {
+  width: 100%;
+}
+
+/* ── Alerts ────────────────────────────────────── */
+.alert {
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 0.86rem;
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+
+.alert--success {
+  background: var(--forest-bg);
+  color: var(--forest);
+  border: 1px solid var(--olive-light);
+}
+
+.alert--error {
+  background: var(--brick-bg);
+  color: var(--brick);
+  border: 1px solid #e0a0a0;
+}
+
+/* ── Outpass cards (student view) ──────────────── */
+.outpass-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 620px;
+}
+
+.outpass-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  transition: box-shadow 0.15s;
+}
+
+.outpass-card:hover {
+  box-shadow: var(--shadow);
+}
+
+.outpass-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.outpass-card__id {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-light);
+}
+
+/* ── Status badges ─────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.71rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge--pending {
+  background: var(--amber-bg);
+  color: var(--amber-dark);
+}
+
+.badge--approved {
+  background: var(--forest-bg);
+  color: var(--forest);
+}
+
+.badge--rejected {
+  background: var(--brick-bg);
+  color: var(--brick);
+}
+
+.badge--overdue {
+  background: var(--burnt-orange-bg);
+  color: var(--burnt-orange);
+}
+
+.outpass-card__reason {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--brown-900);
+  margin-bottom: 6px;
+}
+
+.outpass-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 4px;
+}
+
+.outpass-card__dest {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.86rem;
+  color: var(--text-muted);
+}
+
+.outpass-card__times {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--text-light);
+  margin-top: 4px;
+}
+
+.outpass-card__remark {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--cream);
+  border-radius: var(--radius-xs);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ── Loading / Empty ───────────────────────────── */
+.loading {
+  padding: 32px;
+  text-align: center;
+  color: var(--text-light);
+  font-size: 0.93rem;
+}
+
+.empty-state {
+  padding: 48px;
+  text-align: center;
+  color: var(--text-light);
+  font-size: 0.93rem;
+}
