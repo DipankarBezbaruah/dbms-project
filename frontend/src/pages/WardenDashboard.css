@@ -1,0 +1,228 @@
+/* ── Warden content layout ─────────────────────── */
+.warden-content {
+  display: flex;
+  flex: 1;
+  min-height: calc(100vh - var(--topbar-height));
+}
+
+.warden-queue {
+  flex: 1;
+  max-width: 520px;
+  padding: 20px 24px;
+  border-right: 1px solid var(--border-light);
+  overflow-y: auto;
+}
+
+.warden-queue__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.warden-queue__title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: var(--text-light);
+}
+
+.warden-queue__count {
+  font-size: 0.78rem;
+  color: var(--text-light);
+}
+
+.warden-queue__list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Request cards (warden view) ──────────────── */
+.request-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  transition: box-shadow 0.15s;
+}
+
+.request-card:hover {
+  box-shadow: var(--shadow);
+}
+
+.request-card--overdue {
+  border-left: 3px solid var(--burnt-orange);
+}
+
+.request-card__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.request-card__avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--sand);
+  color: var(--brown-700);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.request-card__avatar--overdue {
+  background: var(--burnt-orange-bg);
+  color: var(--burnt-orange);
+}
+
+.request-card__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.request-card__name {
+  font-size: 0.93rem;
+  font-weight: 700;
+  color: var(--brown-900);
+}
+
+.request-card__meta {
+  font-size: 0.71rem;
+  color: var(--text-light);
+}
+
+.request-card__reason {
+  font-size: 0.93rem;
+  font-weight: 500;
+  color: var(--brown-800);
+  margin-bottom: 6px;
+}
+
+.request-card__dest {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.86rem;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.request-card__time {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+  color: var(--text-light);
+  margin-bottom: 4px;
+}
+
+.request-card__remark-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xs);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.86rem;
+  margin: 10px 0;
+  transition: border-color 0.15s;
+}
+
+.request-card__remark-input:focus {
+  outline: none;
+  border-color: var(--terracotta);
+  box-shadow: 0 0 0 2px var(--terracotta-bg);
+}
+
+.request-card__remark-input::placeholder {
+  color: var(--brown-300);
+}
+
+/* ── Action buttons ────────────────────────────── */
+.request-card__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn--approve {
+  flex: 1;
+  background: var(--forest);
+  color: #fff;
+  padding: 9px 16px;
+  border-radius: var(--radius-xs);
+  font-weight: 600;
+  font-size: 0.86rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+
+.btn--approve:hover {
+  background: var(--olive-dark);
+}
+
+.btn--approve:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn--reject {
+  flex: 1;
+  background: var(--brick-bg);
+  color: var(--brick);
+  padding: 9px 16px;
+  border-radius: var(--radius-xs);
+  font-weight: 600;
+  font-size: 0.86rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+
+.btn--reject:hover {
+  background: #edc0c0;
+}
+
+.btn--reject:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Detail panel ──────────────────────────────── */
+.warden-detail {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+
+.warden-detail__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-light);
+  font-size: 0.86rem;
+}
+
+/* ── no-pad override ───────────────────────────── */
+.dashboard__content--no-pad {
+  padding: 0;
+}
+
+/* ── Overdue badge (reuse) ─────────────────────── */
+.badge--overdue {
+  background: var(--burnt-orange-bg);
+  color: var(--burnt-orange);
+}
