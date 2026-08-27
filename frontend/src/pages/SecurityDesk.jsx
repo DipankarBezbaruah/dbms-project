@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
+import { useAuth } from '../AuthContext';
 import './SecurityDesk.css';
-
-const STAFF_ID = 1; // Hardcoded (Ramu K.)
 
 export default function SecurityDesk() {
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  const staffId = user?.staff_id;
+
   const [outpassId, setOutpassId] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -18,9 +21,9 @@ export default function SecurityDesk() {
     try {
       let res;
       if (action === 'exit') {
-        res = await api.logExit(Number(outpassId), STAFF_ID);
+        res = await api.logExit(Number(outpassId), staffId);
       } else {
-        res = await api.logReturn(Number(outpassId), STAFF_ID);
+        res = await api.logReturn(Number(outpassId), staffId);
       }
       setResult({
         type: 'success',
@@ -35,15 +38,20 @@ export default function SecurityDesk() {
     }
   };
 
+  const handleSignOut = async () => {
+    await logout();
+    navigate('/');
+  };
+
   return (
     <div className="security">
       {/* Header */}
       <div className="security__header">
-        <button className="security__back" onClick={() => navigate('/')}>
+        <button className="security__back" onClick={handleSignOut}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polyline points="15 18 9 12 15 6"/>
           </svg>
-          Back
+          Sign Out
         </button>
         <div className="security__brand">
           <div className="security__logo">
@@ -54,7 +62,7 @@ export default function SecurityDesk() {
             </svg>
           </div>
           <span className="security__brand-name">HostelOut</span>
-          <span className="security__brand-sub">&middot; Security Desk</span>
+          <span className="security__brand-sub">&middot; Security Desk &middot; {user?.name || 'Guard'}</span>
         </div>
       </div>
 

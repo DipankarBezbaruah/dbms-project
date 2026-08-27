@@ -4,6 +4,7 @@ async function request(method, path, body = null) {
   const opts = {
     method,
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include', // send session cookies
   };
   if (body) opts.body = JSON.stringify(body);
 
@@ -20,6 +21,11 @@ async function request(method, path, body = null) {
 }
 
 export const api = {
+  // Auth
+  login: (email, password) => request('POST', '/auth/login', { email, password }),
+  me: () => request('GET', '/auth/me'),
+  logout: () => request('POST', '/auth/logout'),
+
   // Students
   createStudent: (body) => request('POST', '/students', body),
 
@@ -27,10 +33,14 @@ export const api = {
   createOutpass: (body) => request('POST', '/outpasses', body),
   getStudentOutpasses: (studentId) => request('GET', `/outpasses/student/${studentId}`),
   getPendingOutpasses: (hostelId) => request('GET', `/outpasses/pending/${hostelId}`),
-  approveOutpass: (outpassId, wardenId, remark) =>
-    request('POST', `/outpasses/${outpassId}/approve`, { warden_id: wardenId, remark }),
-  rejectOutpass: (outpassId, wardenId, remark) =>
-    request('POST', `/outpasses/${outpassId}/reject`, { warden_id: wardenId, remark }),
+  getMentorPending: (mentorId) => request('GET', `/outpasses/pending/mentor/${mentorId}`),
+  getMentorAllOutpasses: (mentorId) => request('GET', `/outpasses/mentor/${mentorId}`),
+  getDeptPending: (department) => request('GET', `/outpasses/pending/department/${encodeURIComponent(department)}`),
+  getDeptAllOutpasses: (department) => request('GET', `/outpasses/department/${encodeURIComponent(department)}`),
+  approveOutpass: (outpassId, userId, remark) =>
+    request('POST', `/outpasses/${outpassId}/approve`, { user_id: userId, remark }),
+  rejectOutpass: (outpassId, userId, remark) =>
+    request('POST', `/outpasses/${outpassId}/reject`, { user_id: userId, remark }),
 
   // Gate Log
   logExit: (outpassId, staffId) =>
@@ -40,4 +50,6 @@ export const api = {
 
   // Reports
   getOverdueReport: (hostelId) => request('GET', `/reports/overdue/${hostelId}`),
+  getMentorOverdueReport: (mentorId) => request('GET', `/reports/overdue/mentor/${mentorId}`),
+  getDeptOverdueReport: (department) => request('GET', `/reports/overdue/department/${encodeURIComponent(department)}`),
 };

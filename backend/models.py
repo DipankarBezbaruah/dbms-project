@@ -1,12 +1,21 @@
 """SQLAlchemy ORM models for HostelOut."""
 
 from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
 import enum
 
 db = SQLAlchemy()
 
 
 # ── Enum types ────────────────────────────────────────────────────────────────
+
+class UserRole(enum.Enum):
+    Student = "Student"
+    Mentor = "Mentor"
+    Warden = "Warden"
+    HOD = "HOD"
+    Security = "Security"
+
 
 class OutpassStatus(enum.Enum):
     Pending = "Pending"
@@ -21,16 +30,72 @@ class ApprovalDecision(enum.Enum):
 
 # ── Models ────────────────────────────────────────────────────────────────────
 
+class User(db.Model):
+    """Unified login table — every person who signs in has exactly one row here."""
+    __tablename__ = "users"
+
+    user_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(256), nullable=False)
+    role = db.Column(db.Enum(UserRole), nullable=False)
+    name = db.Column(db.String(120), nullable=False)
+
+    # One-to-one back-references (set by the child tables)
+    student = db.relationship("Student", back_populates="user", uselist=False)
+    warden = db.relationship("Warden", back_populates="user", uselist=False)
+    mentor = db.relationship("Mentor", back_populates="user", uselist=False)
+    hod = db.relationship("HOD", back_populates="user", uselist=False)
+    security_staff = db.relationship("SecurityStaff", back_populates="user", uselist=False)
+
+    def set_password(self, password: str):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password: str) -> bool:
+        return check_password_hash(self.password_hash, password)
+
+
+class Mentor(db.Model):
+    """A faculty member who mentors a group of students."""
+    __tablename__ = "mentors"
+
+    mentor_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.user_id"), unique=True, nullable=False
+    )
+    department = db.Column(db.String(100), nullable=False)
+
+    # Relationships
+    user = db.relationship("User", back_populates="mentor")
+    students = db.relationship("Student", back_populates="mentor")
+
+
+class HOD(db.Model):
+    """Head of Department — has oversight over all students in their department."""
+    __tablename__ = "hods"
+
+    hod_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.user_id"), unique=True, nullable=False
+    )
+    department = db.Column(db.String(100), nullable=False)
+
+    # Relationships
+    user = db.relationship("User", back_populates="hod")
+
+
 class Warden(db.Model):
     __tablename__ = "wardens"
 
     warden_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.user_id"), unique=True, nullable=False
+    )
     name = db.Column(db.String(120), nullable=False)
     contact_no = db.Column(db.String(20), nullable=False)
 
     # Relationships
+    user = db.relationship("User", back_populates="warden")
     hostels = db.relationship("Hostel", back_populates="warden")
-    approvals = db.relationship("Approval", back_populates="warden")
 
 
 class Hostel(db.Model):
@@ -66,6 +131,9 @@ class Student(db.Model):
     __tablename__ = "students"
 
     student_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.user_id"), unique=True, nullable=False
+    )
     name = db.Column(db.String(120), nullable=False)
     roll_no = db.Column(db.String(30), unique=True, nullable=False)
     room_id = db.Column(
@@ -75,10 +143,16 @@ class Student(db.Model):
         db.Integer, db.ForeignKey("hostels.hostel_id"), nullable=False
     )
     contact_no = db.Column(db.String(20), nullable=False)
+    mentor_id = db.Column(
+        db.Integer, db.ForeignKey("mentors.mentor_id"), nullable=True
+    )
+    department = db.Column(db.String(100), nullable=True)
 
     # Relationships
+    user = db.relationship("User", back_populates="student")
     room = db.relationship("Room", back_populates="students")
     hostel = db.relationship("Hostel", back_populates="students")
+    mentor = db.relationship("Mentor", back_populates="students")
     outpasses = db.relationship("Outpass", back_populates="student")
 
 
@@ -86,10 +160,14 @@ class SecurityStaff(db.Model):
     __tablename__ = "security_staff"
 
     staff_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.user_id"), unique=True, nullable=False
+    )
     name = db.Column(db.String(120), nullable=False)
     shift = db.Column(db.String(30), nullable=False)
 
     # Relationships
+    user = db.relationship("User", back_populates="security_staff")
     gate_logs = db.relationship("GateLog", back_populates="staff")
 
 
@@ -129,15 +207,16 @@ class Approval(db.Model):
         unique=True,  # one-to-one
         nullable=False,
     )
-    warden_id = db.Column(
-        db.Integer, db.ForeignKey("wardens.warden_id"), nullable=False
+    approved_by = db.Column(
+        db.Integer, db.ForeignKey("users.user_id"), nullable=False
     )
+    approver_role = db.Column(db.String(30), nullable=False)  # e.g. "Warden", "Mentor", "HOD"
     decision = db.Column(db.Enum(ApprovalDecision), nullable=False)
     decided_at = db.Column(db.DateTime, nullable=False)
 
     # Relationships
     outpass = db.relationship("Outpass", back_populates="approval")
-    warden = db.relationship("Warden", back_populates="approvals")
+    approver = db.relationship("User")
 
 
 class GateLog(db.Model):

@@ -10,3 +10,4 @@ class Config:
         "mysql+pymysql://root:root@localhost/hostelout",
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SECRET_KEY = os.getenv("SECRET_KEY", "hostelout-dev-secret-key")

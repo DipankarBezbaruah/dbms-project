@@ -1,14 +1,19 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import './Sidebar.css';
 
-export default function Sidebar({ role, userName, userDetail, navItems, basePath }) {
+export default function Sidebar({ role, userName, userDetail, navItems, basePath, onSignOut }) {
   const navigate = useNavigate();
   const location = useLocation();
+
+  const handleSignOut = async () => {
+    if (onSignOut) await onSignOut();
+    navigate('/');
+  };
 
   return (
     <aside className="sidebar">
       {/* Brand */}
-      <div className="sidebar__brand" onClick={() => navigate('/')}>
+      <div className="sidebar__brand" onClick={() => navigate(basePath || '/')}>
         <div className="sidebar__logo">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
             <path d="M12 2L3 7v10l9 5 9-5V7l-9-5z" fill="#fff" opacity="0.9"/>
@@ -64,7 +69,7 @@ export default function Sidebar({ role, userName, userDetail, navItems, basePath
       </nav>
 
       {/* Sign out */}
-      <button className="sidebar__signout" onClick={() => navigate('/')}>
+      <button className="sidebar__signout" onClick={handleSignOut}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
           <polyline points="16 17 21 12 16 7"/>
@@ -75,3 +80,4 @@ export default function Sidebar({ role, userName, userDetail, navItems, basePath
     </aside>
   );
 }
+
