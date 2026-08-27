@@ -4,11 +4,8 @@ import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import SubNav from '../components/SubNav';
 import { api } from '../api';
+import { useAuth } from '../AuthContext';
 import './StudentDashboard.css';
-
-const STUDENT_ID = 1; // Hardcoded for testing (Rahul D.)
-const HOSTEL_NAME = 'Bhaskar Hostel';
-const ROOM = 'Room 101';
 
 /* ── SVG icon fragments ────────────────────────── */
 const IconPlus = (
@@ -23,9 +20,30 @@ const IconList = (
   </svg>
 );
 
+function getTodayDateStr(offsetDays = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return d.toISOString().split('T')[0];
+}
+
+function getCurrentTimeStr(offsetHours = 0) {
+  const d = new Date();
+  d.setHours(d.getHours() + offsetHours);
+  const h = String(d.getHours()).padStart(2, '0');
+  const m = String(d.getMinutes()).padStart(2, '0');
+  return `${h}:${m}`;
+}
+
 /* ── New Request form ──────────────────────────── */
-function NewRequest() {
-  const [form, setForm] = useState({ reason: '', destination: '', departure: '', returnTime: '' });
+function NewRequest({ studentId }) {
+  const [form, setForm] = useState({
+    reason: '',
+    destination: '',
+    depDate: getTodayDateStr(0),
+    depTime: getCurrentTimeStr(1),
+    retDate: getTodayDateStr(1),
+    retTime: '18:00',
+  });
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState(null);
   const [err, setErr] = useState(null);
@@ -36,15 +54,25 @@ function NewRequest() {
     setMsg(null);
     setErr(null);
     try {
+      const departureIso = `${form.depDate}T${form.depTime || '09:00'}`;
+      const returnIso = `${form.retDate}T${form.retTime || '18:00'}`;
+
       const res = await api.createOutpass({
-        student_id: STUDENT_ID,
+        student_id: studentId,
         reason: form.reason,
         destination: form.destination,
-        requested_departure: form.departure,
-        requested_return: form.returnTime,
+        requested_departure: departureIso,
+        requested_return: returnIso,
       });
       setMsg(`Outpass #${res.outpass_id} submitted successfully!`);
-      setForm({ reason: '', destination: '', departure: '', returnTime: '' });
+      setForm({
+        reason: '',
+        destination: '',
+        depDate: getTodayDateStr(0),
+        depTime: getCurrentTimeStr(1),
+        retDate: getTodayDateStr(1),
+        retTime: '18:00',
+      });
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -87,24 +115,46 @@ function NewRequest() {
 
         <div className="form-row">
           <div className="form-group form-group--half">
-            <label className="form-label">Departure time</label>
-            <input
-              className="form-input"
-              type="datetime-local"
-              value={form.departure}
-              onChange={(e) => setForm({ ...form, departure: e.target.value })}
-              required
-            />
+            <label className="form-label">Departure Date &amp; Time</label>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                className="form-input"
+                type="date"
+                style={{ flex: 1.4 }}
+                value={form.depDate}
+                onChange={(e) => setForm({ ...form, depDate: e.target.value })}
+                required
+              />
+              <input
+                className="form-input"
+                type="time"
+                style={{ flex: 1 }}
+                value={form.depTime}
+                onChange={(e) => setForm({ ...form, depTime: e.target.value })}
+                required
+              />
+            </div>
           </div>
           <div className="form-group form-group--half">
-            <label className="form-label">Expected return</label>
-            <input
-              className="form-input"
-              type="datetime-local"
-              value={form.returnTime}
-              onChange={(e) => setForm({ ...form, returnTime: e.target.value })}
-              required
-            />
+            <label className="form-label">Expected Return Date &amp; Time</label>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                className="form-input"
+                type="date"
+                style={{ flex: 1.4 }}
+                value={form.retDate}
+                onChange={(e) => setForm({ ...form, retDate: e.target.value })}
+                required
+              />
+              <input
+                className="form-input"
+                type="time"
+                style={{ flex: 1 }}
+                value={form.retTime}
+                onChange={(e) => setForm({ ...form, retTime: e.target.value })}
+                required
+              />
+            </div>
           </div>
         </div>
 
@@ -117,17 +167,17 @@ function NewRequest() {
 }
 
 /* ── My Outpasses list ─────────────────────────── */
-function MyOutpasses() {
+function MyOutpasses({ studentId }) {
   const [outpasses, setOutpasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
 
   useEffect(() => {
-    api.getStudentOutpasses(STUDENT_ID)
+    api.getStudentOutpasses(studentId)
       .then(setOutpasses)
       .catch((e) => setErr(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [studentId]);
 
   const statusClass = (s) => {
     if (s === 'Approved') return 'badge--approved';
@@ -190,6 +240,12 @@ function MyOutpasses() {
 
 /* ── Dashboard shell ───────────────────────────── */
 export default function StudentDashboard() {
+  const { user, logout } = useAuth();
+
+  const studentId = user?.student_id;
+  const hostelName = user?.hostel_name || 'Hostel';
+  const roomNo = user?.room_no ? `Room ${user.room_no}` : '';
+
   const sidebarNav = [
     { path: '', label: '+ New Request', icon: IconPlus },
     { path: '/history', label: 'My Outpasses', icon: IconList },
@@ -221,18 +277,19 @@ export default function StudentDashboard() {
     <div className="dashboard">
       <Sidebar
         role="Student"
-        userName="Rahul D. · B-101"
+        userName={`${user?.name || 'Student'} · ${roomNo}`}
         navItems={sidebarNav}
         basePath="/student"
+        onSignOut={logout}
       />
       <div className="dashboard__main">
-        <TopBar title="Student Portal" subtitle={`${HOSTEL_NAME} · ${ROOM}`} />
+        <TopBar title="Student Portal" subtitle={`${hostelName} · ${roomNo}`} />
         <div className="dashboard__body">
           <SubNav items={subNavItems} basePath="/student" />
           <div className="dashboard__content">
             <Routes>
-              <Route path="/" element={<NewRequest />} />
-              <Route path="/history" element={<MyOutpasses />} />
+              <Route path="/" element={<NewRequest studentId={studentId} />} />
+              <Route path="/history" element={<MyOutpasses studentId={studentId} />} />
               <Route path="*" element={<Navigate to="/student" replace />} />
             </Routes>
           </div>

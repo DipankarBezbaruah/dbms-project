@@ -4,11 +4,8 @@ import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import SubNav from '../components/SubNav';
 import { api } from '../api';
+import { useAuth } from '../AuthContext';
 import './WardenDashboard.css';
-
-const WARDEN_ID = 1;
-const HOSTEL_ID = 1;
-const HOSTEL_NAME = 'Bhaskar Hostel';
 
 /* ── icons ──────────────────────────────────────── */
 const IconQueue = (
@@ -35,7 +32,7 @@ function fmtDate(iso) {
 }
 
 /* ── Pending Queue ──────────────────────────────── */
-function PendingQueue() {
+function PendingQueue({ userId, hostelId }) {
   const [outpasses, setOutpasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
@@ -45,11 +42,11 @@ function PendingQueue() {
 
   const fetchPending = useCallback(() => {
     setLoading(true);
-    api.getPendingOutpasses(HOSTEL_ID)
+    api.getPendingOutpasses(hostelId)
       .then(setOutpasses)
       .catch((e) => setErr(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [hostelId]);
 
   useEffect(() => { fetchPending(); }, [fetchPending]);
 
@@ -59,10 +56,10 @@ function PendingQueue() {
     try {
       const remark = remarks[outpassId] || '';
       if (action === 'approve') {
-        await api.approveOutpass(outpassId, WARDEN_ID, remark);
+        await api.approveOutpass(outpassId, userId, remark);
         setActionMsg(prev => ({ ...prev, [outpassId]: { type: 'success', text: 'Approved!' } }));
       } else {
-        await api.rejectOutpass(outpassId, WARDEN_ID, remark);
+        await api.rejectOutpass(outpassId, userId, remark);
         setActionMsg(prev => ({ ...prev, [outpassId]: { type: 'success', text: 'Rejected.' } }));
       }
       setTimeout(fetchPending, 600);
@@ -175,17 +172,17 @@ function PendingQueue() {
 }
 
 /* ── Overdue Overview ───────────────────────────── */
-function Overview() {
+function Overview({ hostelId }) {
   const [overdue, setOverdue] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
 
   useEffect(() => {
-    api.getOverdueReport(HOSTEL_ID)
+    api.getOverdueReport(hostelId)
       .then(setOverdue)
       .catch((e) => setErr(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [hostelId]);
 
   return (
     <div className="warden-content">
@@ -246,17 +243,29 @@ function Overview() {
 
 /* ── Dashboard shell ────────────────────────────── */
 export default function WardenDashboard() {
+  const { user, logout } = useAuth();
+
+  const wardenId = user?.warden_id;
+  const hostelId = user?.hostel_id;
+  const hostelName = user?.hostel_name || 'Hostel';
+
   const [pendingCount, setPendingCount] = useState(0);
+  const [overdueCount, setOverdueCount] = useState(0);
 
   useEffect(() => {
-    api.getPendingOutpasses(HOSTEL_ID)
-      .then(data => setPendingCount(data.length))
-      .catch(() => {});
-  }, []);
+    if (hostelId) {
+      api.getPendingOutpasses(hostelId)
+        .then(data => setPendingCount(data.length))
+        .catch(() => {});
+      api.getOverdueReport(hostelId)
+        .then(data => setOverdueCount(data.length))
+        .catch(() => {});
+    }
+  }, [hostelId]);
 
   const sidebarNav = [
     { path: '', label: 'Pending Queue', icon: IconQueue, badge: pendingCount },
-    { path: '/overview', label: 'Overview', icon: IconChart },
+    { path: '/overview', label: 'Overdue', icon: IconChart, badge: overdueCount },
   ];
 
   const subNavItems = [
@@ -273,7 +282,8 @@ export default function WardenDashboard() {
     },
     {
       path: '/overview',
-      label: 'Overview',
+      label: 'Overdue',
+      badge: overdueCount,
       icon: (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/>
@@ -287,21 +297,22 @@ export default function WardenDashboard() {
     <div className="dashboard">
       <Sidebar
         role="Warden"
-        userName="Dr. A. K. Sharma \u00b7 Bh..."
+        userName={`${user?.name || 'Warden'} · ${hostelName}`}
         navItems={sidebarNav}
         basePath="/warden"
+        onSignOut={logout}
       />
       <div className="dashboard__main">
         <TopBar
           title="Warden Console"
-          subtitle={`${HOSTEL_NAME} · Pending: ${pendingCount}`}
+          subtitle={`${hostelName} · Pending: ${pendingCount} · Overdue: ${overdueCount}`}
         />
         <div className="dashboard__body">
           <SubNav items={subNavItems} basePath="/warden" />
           <div className="dashboard__content dashboard__content--no-pad">
             <Routes>
-              <Route path="/" element={<PendingQueue />} />
-              <Route path="/overview" element={<Overview />} />
+              <Route path="/" element={<PendingQueue userId={user?.user_id} hostelId={hostelId} />} />
+              <Route path="/overview" element={<Overview hostelId={hostelId} />} />
               <Route path="*" element={<Navigate to="/warden" replace />} />
             </Routes>
           </div>
