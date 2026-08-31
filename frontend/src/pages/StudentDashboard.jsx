@@ -217,17 +217,26 @@ function MyOutpasses({ studentId }) {
                 {op.destination}
               </span>
             </div>
+            {(op.hostel_name || op.warden_name) && (
+              <div className="outpass-card__meta" style={{ fontSize: '0.85em', color: 'var(--brown-500, #6b5a4a)' }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+                {op.hostel_name}{op.warden_name ? ` · Warden: ${op.warden_name}` : ''}
+              </div>
+            )}
             <div className="outpass-card__times">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
               </svg>
               {fmtDate(op.requested_departure)} &rarr; {fmtDate(op.requested_return)}
             </div>
-            {op.warden_remark && (
-              <div className="outpass-card__remark">
-                Warden: &ldquo;{op.warden_remark}&rdquo;
+
+            {op.approvals && op.approvals.length > 0 && op.approvals.filter(a => a.remark).map(a => (
+              <div key={a.approval_id} className="outpass-card__remark" style={{ marginTop: '4px', fontStyle: 'italic', color: 'var(--brown-600, #5a4a3a)' }}>
+                {a.approver_role}: &ldquo;{a.remark}&rdquo;
               </div>
-            )}
+            ))}
           </div>
         ))}
         {!loading && outpasses.length === 0 && (
@@ -244,6 +253,7 @@ export default function StudentDashboard() {
 
   const studentId = user?.student_id;
   const hostelName = user?.hostel_name || 'Hostel';
+  const wardenName = user?.warden_name || '';
   const roomNo = user?.room_no ? `Room ${user.room_no}` : '';
 
   const sidebarNav = [
@@ -277,13 +287,19 @@ export default function StudentDashboard() {
     <div className="dashboard">
       <Sidebar
         role="Student"
-        userName={`${user?.name || 'Student'} · ${roomNo}`}
+        userName={user?.name || 'Student'}
+        userDetail={[
+          user?.email,
+          user?.roll_no ? `Roll No: ${user.roll_no}` : null,
+          user?.department ? `Dept: ${user.department}` : null,
+          user?.room_no ? `Room: ${user.room_no}` : null,
+        ].filter(Boolean)}
         navItems={sidebarNav}
         basePath="/student"
         onSignOut={logout}
       />
       <div className="dashboard__main">
-        <TopBar title="Student Portal" subtitle={`${hostelName} · ${roomNo}`} />
+        <TopBar title="Student Portal" subtitle={`${hostelName}${wardenName ? ` · Warden: ${wardenName}` : ''} · ${roomNo}`} />
         <div className="dashboard__body">
           <SubNav items={subNavItems} basePath="/student" />
           <div className="dashboard__content">

@@ -40,7 +40,7 @@ export default function SignIn() {
         </div>
         <h1 className="signin__title">HostelOut</h1>
       </div>
-      <p className="signin__subtitle">Digital Outpass &amp; Leave Register &middot; Tezpur University</p>
+      <p className="signin__subtitle">Digital Outpass &amp; Leave Register</p>
 
       {/* Login form */}
       <form className="signin__form" onSubmit={handleSubmit}>
@@ -52,7 +52,7 @@ export default function SignIn() {
             id="signin-email"
             className="signin__input"
             type="email"
-            placeholder="your.id@tezu.ac.in"
+            placeholder="your.id@gmail.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -121,7 +121,7 @@ export default function SignIn() {
         </div>
       </div>
 
-      <p className="signin__footer">Sign in with your university email. Your role is determined automatically.</p>
+      <p className="signin__footer">Sign in with your registered email. Your role is determined automatically.</p>
     </div>
   );
 }

@@ -298,6 +298,10 @@ export default function WardenDashboard() {
       <Sidebar
         role="Warden"
         userName={`${user?.name || 'Warden'} · ${hostelName}`}
+        userDetail={[
+          user?.email,
+          user?.contact_no ? `Contact: ${user.contact_no}` : null,
+        ].filter(Boolean)}
         navItems={sidebarNav}
         basePath="/warden"
         onSignOut={logout}

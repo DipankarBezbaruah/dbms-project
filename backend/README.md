@@ -1,6 +1,6 @@
 # HostelOut Backend — Digital Outpass & Leave Register
 
-Flask + SQLAlchemy + MySQL backend for the Tezpur University hostel outpass system.
+Flask + SQLAlchemy + MySQL backend for the hostel outpass system.
 
 ## Prerequisites
 

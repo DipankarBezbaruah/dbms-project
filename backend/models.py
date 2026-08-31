@@ -7,7 +7,7 @@ import enum
 db = SQLAlchemy()
 
 
-# ── Enum types ────────────────────────────────────────────────────────────────
+# -- Enum types ----------------------------------------------------------------
 
 class UserRole(enum.Enum):
     Student = "Student"
@@ -19,6 +19,7 @@ class UserRole(enum.Enum):
 
 class OutpassStatus(enum.Enum):
     Pending = "Pending"
+    PartiallyApproved = "PartiallyApproved"
     Approved = "Approved"
     Rejected = "Rejected"
 
@@ -28,10 +29,10 @@ class ApprovalDecision(enum.Enum):
     Rejected = "Rejected"
 
 
-# ── Models ────────────────────────────────────────────────────────────────────
+# -- Models --------------------------------------------------------------------
 
 class User(db.Model):
-    """Unified login table — every person who signs in has exactly one row here."""
+    """Unified login table -- every person who signs in has exactly one row here."""
     __tablename__ = "users"
 
     user_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -70,7 +71,7 @@ class Mentor(db.Model):
 
 
 class HOD(db.Model):
-    """Head of Department — has oversight over all students in their department."""
+    """Head of Department -- has oversight over all students in their department."""
     __tablename__ = "hods"
 
     hod_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -185,16 +186,43 @@ class Outpass(db.Model):
     status = db.Column(
         db.Enum(OutpassStatus), nullable=False, default=OutpassStatus.Pending
     )
-    warden_remark = db.Column(db.Text, nullable=True)
+    remark = db.Column(db.Text, nullable=True)
+
+    # Multi-level approval tracking
+    mentor_approved = db.Column(db.Boolean, nullable=False, default=False)
+    warden_approved = db.Column(db.Boolean, nullable=False, default=False)
+    hod_approved = db.Column(db.Boolean, nullable=True, default=None)
+    # hod_approved: None = not required (<= 7 days), False = required but pending, True = approved
 
     # Relationships
     student = db.relationship("Student", back_populates="outpasses")
-    approval = db.relationship(
-        "Approval", back_populates="outpass", uselist=False
+    approvals = db.relationship(
+        "Approval", back_populates="outpass", lazy="dynamic"
     )
     gate_log = db.relationship(
         "GateLog", back_populates="outpass", uselist=False
     )
+
+    @property
+    def leave_days(self):
+        """Calculate the number of calendar days between departure and return."""
+        dep_date = self.requested_departure.date() if hasattr(self.requested_departure, 'date') else self.requested_departure
+        ret_date = self.requested_return.date() if hasattr(self.requested_return, 'date') else self.requested_return
+        return (ret_date - dep_date).days
+
+    @property
+    def requires_hod(self):
+        """Whether this outpass requires HOD approval (> 7 days)."""
+        return self.leave_days > 7
+
+    @property
+    def is_fully_approved(self):
+        """Check if all required approvals are in."""
+        if not self.mentor_approved or not self.warden_approved:
+            return False
+        if self.requires_hod and not self.hod_approved:
+            return False
+        return True
 
 
 class Approval(db.Model):
@@ -204,18 +232,19 @@ class Approval(db.Model):
     outpass_id = db.Column(
         db.Integer,
         db.ForeignKey("outpasses.outpass_id"),
-        unique=True,  # one-to-one
         nullable=False,
+        # NO unique constraint -- multiple approvals per outpass
     )
     approved_by = db.Column(
         db.Integer, db.ForeignKey("users.user_id"), nullable=False
     )
-    approver_role = db.Column(db.String(30), nullable=False)  # e.g. "Warden", "Mentor", "HOD"
+    approver_role = db.Column(db.String(30), nullable=False)  # "Warden", "Mentor", "HOD"
     decision = db.Column(db.Enum(ApprovalDecision), nullable=False)
+    remark = db.Column(db.Text, nullable=True)
     decided_at = db.Column(db.DateTime, nullable=False)
 
     # Relationships
-    outpass = db.relationship("Outpass", back_populates="approval")
+    outpass = db.relationship("Outpass", back_populates="approvals")
     approver = db.relationship("User")
 
 

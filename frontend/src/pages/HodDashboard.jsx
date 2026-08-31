@@ -111,6 +111,14 @@ function DeptPending({ department, userId, onActionComplete }) {
                 </svg>
                 {op.destination}
               </div>
+              {(op.hostel_name || op.warden_name) && (
+                <div className="request-card__time" style={{ fontSize: '0.85em', color: 'var(--brown-500, #6b5a4a)', marginTop: '4px' }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                  {op.hostel_name}{op.warden_name ? ` · Warden: ${op.warden_name}` : ''}
+                </div>
+              )}
               <div className="request-card__time">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
@@ -215,6 +223,14 @@ function DeptHistory({ department }) {
                 </svg>
                 {op.destination}
               </div>
+              {(op.hostel_name || op.warden_name) && (
+                <div className="request-card__time" style={{ fontSize: '0.85em', color: 'var(--brown-500, #6b5a4a)', marginTop: '4px' }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                  {op.hostel_name}{op.warden_name ? ` · Warden: ${op.warden_name}` : ''}
+                </div>
+              )}
               <div className="request-card__time">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
@@ -284,6 +300,14 @@ function DeptOverdue({ department }) {
                 </svg>
                 {op.destination}
               </div>
+              {(op.hostel_name || op.warden_name) && (
+                <div className="request-card__time" style={{ fontSize: '0.85em', color: 'var(--brown-500, #6b5a4a)', marginTop: '4px' }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                  {op.hostel_name}{op.warden_name ? ` · Warden: ${op.warden_name}` : ''}
+                </div>
+              )}
               <div className="request-card__time">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
@@ -335,7 +359,17 @@ export default function HodDashboard() {
 
   return (
     <div className="dashboard">
-      <Sidebar role="HOD" userName={`${user?.name || 'HOD'} · ${department}`} navItems={sidebarNav} basePath="/hod" onSignOut={logout} />
+      <Sidebar 
+        role="HOD" 
+        userName={`${user?.name || 'HOD'} · ${department}`} 
+        userDetail={[
+          user?.email,
+          user?.department ? `Dept: ${user.department}` : null,
+        ].filter(Boolean)}
+        navItems={sidebarNav} 
+        basePath="/hod" 
+        onSignOut={logout} 
+      />
       <div className="dashboard__main">
         <TopBar title="HOD Dashboard" subtitle={`${user?.name || 'HOD'} · ${department} · ${pendingCount} pending · ${overdueCount} overdue`} />
         <div className="dashboard__body">

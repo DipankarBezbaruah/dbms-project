@@ -111,6 +111,14 @@ function MenteePending({ mentorId, userId, onActionComplete }) {
                 </svg>
                 {op.destination}
               </div>
+              {(op.hostel_name || op.warden_name) && (
+                <div className="request-card__time" style={{ fontSize: '0.85em', color: 'var(--brown-500, #6b5a4a)', marginTop: '4px' }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                  {op.hostel_name}{op.warden_name ? ` · Warden: ${op.warden_name}` : ''}
+                </div>
+              )}
               <div className="request-card__time">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
@@ -215,6 +223,14 @@ function MenteeHistory({ mentorId }) {
                 </svg>
                 {op.destination}
               </div>
+              {(op.hostel_name || op.warden_name) && (
+                <div className="request-card__time" style={{ fontSize: '0.85em', color: 'var(--brown-500, #6b5a4a)', marginTop: '4px' }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                  {op.hostel_name}{op.warden_name ? ` · Warden: ${op.warden_name}` : ''}
+                </div>
+              )}
               <div className="request-card__time">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
@@ -284,6 +300,14 @@ function MenteeOverdue({ mentorId }) {
                 </svg>
                 {op.destination}
               </div>
+              {(op.hostel_name || op.warden_name) && (
+                <div className="request-card__time" style={{ fontSize: '0.85em', color: 'var(--brown-500, #6b5a4a)', marginTop: '4px' }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                  {op.hostel_name}{op.warden_name ? ` · Warden: ${op.warden_name}` : ''}
+                </div>
+              )}
               <div className="request-card__time">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
@@ -336,8 +360,17 @@ export default function MentorDashboard() {
 
   return (
     <div className="dashboard">
-      <Sidebar role="Mentor" userName={`${user?.name || 'Mentor'} · ${department}`} navItems={sidebarNav} basePath="/mentor" onSignOut={logout} />
-      <div className="dashboard__main">
+      <Sidebar
+        role="Mentor"
+        userName={`${user?.name || 'Mentor'} · ${department}`}
+        userDetail={[
+          user?.email,
+          user?.department ? `Dept: ${user.department}` : null,
+        ].filter(Boolean)}
+        navItems={sidebarNav}
+        basePath="/mentor"
+        onSignOut={logout}
+      /><div className="dashboard__main">
         <TopBar title="Mentor View" subtitle={`${user?.name || 'Mentor'} · ${department} Dept · ${pendingCount} pending · ${overdueCount} overdue`} />
         <div className="dashboard__body">
           <SubNav items={subNavItems} basePath="/mentor" />

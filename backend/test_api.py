@@ -57,7 +57,7 @@ test("POST /students — create student",
 test("POST /outpasses — new outpass request",
      "POST", "/outpasses",
      {"student_id": 3, "reason": "Shopping",
-      "destination": "Tezpur Market",
+      "destination": "City Market",
       "requested_departure": "2026-08-22T10:00:00",
       "requested_return": "2026-08-22T18:00:00"},
      expect_status=201)

@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './Sidebar.css';
 
 export default function Sidebar({ role, userName, userDetail, navItems, basePath, onSignOut }) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -28,7 +30,7 @@ export default function Sidebar({ role, userName, userDetail, navItems, basePath
       </div>
 
       {/* User info */}
-      <div className="sidebar__user">
+      <div className="sidebar__user" onClick={() => setIsMenuOpen(!isMenuOpen)} style={{ cursor: 'pointer' }}>
         <div className="sidebar__user-icon">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
@@ -37,12 +39,29 @@ export default function Sidebar({ role, userName, userDetail, navItems, basePath
         </div>
         <div className="sidebar__user-info">
           <div className="sidebar__user-role">{role}</div>
-          <div className="sidebar__user-name">{userName}</div>
+          <div className="sidebar__user-name" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{userName}</div>
         </div>
-        <svg className="sidebar__user-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg 
+          className="sidebar__user-chevron" 
+          width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+          style={{ transform: isMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}
+        >
           <polyline points="6 9 12 15 18 9"/>
         </svg>
       </div>
+
+      {isMenuOpen && userDetail && (
+        <div className="sidebar__user-details" style={{
+          padding: '0 16px 16px 48px',
+          fontSize: '0.8rem',
+          color: 'var(--brown-500)',
+          borderBottom: '1px solid var(--sand-300)'
+        }}>
+          {userDetail.map((line, i) => (
+            <div key={i} style={{ marginBottom: '4px' }}>{line}</div>
+          ))}
+        </div>
+      )}
 
       {/* Nav */}
       <nav className="sidebar__nav">

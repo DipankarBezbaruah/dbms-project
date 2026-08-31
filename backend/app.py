@@ -1,6 +1,6 @@
-"""HostelOut — Flask REST API for Digital Outpass & Leave Register."""
+"""HostelOut -- Flask REST API for Digital Outpass & Leave Register."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from flask import Flask, request, jsonify, session
 from flask_cors import CORS
@@ -35,8 +35,11 @@ def create_app():
 
 app = create_app()
 
+# Minimum minutes between exit and return logging (anti-cheat)
+MIN_RETURN_GAP_MINUTES = 30
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+
+# -- Helpers -------------------------------------------------------------------
 
 def _now():
     """Return the current UTC time."""
@@ -44,28 +47,43 @@ def _now():
 
 
 def _outpass_to_dict(op: Outpass) -> dict:
-    """Serialize an Outpass (and nested approval / gate_log) to a dict."""
+    """Serialize an Outpass (and nested approvals / gate_log) to a dict."""
     d = {
         "outpass_id": op.outpass_id,
         "student_id": op.student_id,
         "student_name": op.student.name,
         "roll_no": op.student.roll_no,
+        "department": op.student.department,
+        "hostel_name": op.student.hostel.hostel_name if op.student.hostel else None,
+        "warden_name": op.student.hostel.warden.name if op.student.hostel and op.student.hostel.warden else None,
         "reason": op.reason,
         "destination": op.destination,
         "requested_departure": op.requested_departure.isoformat(),
         "requested_return": op.requested_return.isoformat(),
+        "leave_days": op.leave_days,
         "status": op.status.value,
-        "warden_remark": op.warden_remark,
+        "remark": op.remark,
+        # Multi-level approval status
+        "mentor_approved": op.mentor_approved,
+        "warden_approved": op.warden_approved,
+        "hod_approved": op.hod_approved,
+        "requires_hod": op.requires_hod,
     }
-    if op.approval:
-        d["approval"] = {
-            "approval_id": op.approval.approval_id,
-            "approved_by": op.approval.approved_by,
-            "approver_name": op.approval.approver.name if op.approval.approver else None,
-            "approver_role": op.approval.approver_role,
-            "decision": op.approval.decision.value,
-            "decided_at": op.approval.decided_at.isoformat(),
-        }
+
+    # All approval records
+    approval_list = []
+    for a in op.approvals:
+        approval_list.append({
+            "approval_id": a.approval_id,
+            "approved_by": a.approved_by,
+            "approver_name": a.approver.name if a.approver else None,
+            "approver_role": a.approver_role,
+            "decision": a.decision.value,
+            "remark": a.remark,
+            "decided_at": a.decided_at.isoformat(),
+        })
+    d["approvals"] = approval_list
+
     if op.gate_log:
         d["gate_log"] = {
             "gatelog_id": op.gate_log.gatelog_id,
@@ -81,10 +99,10 @@ def _outpass_to_dict(op: Outpass) -> dict:
                 else None
             ),
         }
+
     # Computed overdue flag
     if op.status == OutpassStatus.Approved and op.gate_log and op.gate_log.actual_exit_time:
         compare_time = op.gate_log.actual_return_time or _now()
-        # Make requested_return offset-aware if it isn't already
         req_return = op.requested_return
         if req_return.tzinfo is None:
             req_return = req_return.replace(tzinfo=timezone.utc)
@@ -116,6 +134,7 @@ def _user_payload(user: User) -> dict:
         payload["roll_no"] = s.roll_no
         payload["hostel_id"] = s.hostel_id
         payload["hostel_name"] = s.hostel.hostel_name if s.hostel else None
+        payload["warden_name"] = s.hostel.warden.name if s.hostel and s.hostel.warden else None
         payload["room_no"] = s.room.room_no if s.room else None
         payload["mentor_id"] = s.mentor_id
         payload["department"] = s.department
@@ -123,12 +142,10 @@ def _user_payload(user: User) -> dict:
         w = user.warden
         payload["warden_id"] = w.warden_id
         payload["contact_no"] = w.contact_no
-        # Include all hostels this warden manages
         payload["hostels"] = [
             {"hostel_id": h.hostel_id, "hostel_name": h.hostel_name}
             for h in w.hostels
         ]
-        # Convenience: primary hostel (first one)
         if w.hostels:
             payload["hostel_id"] = w.hostels[0].hostel_id
             payload["hostel_name"] = w.hostels[0].hostel_name
@@ -148,7 +165,7 @@ def _user_payload(user: User) -> dict:
     return payload
 
 
-# ── Auth Routes ───────────────────────────────────────────────────────────────
+# -- Auth Routes ---------------------------------------------------------------
 
 @app.route("/auth/login", methods=["POST"])
 def login():
@@ -164,7 +181,6 @@ def login():
     if not user or not user.check_password(password):
         return jsonify({"error": "Invalid email or password"}), 401
 
-    # Store user_id in session
     session["user_id"] = user.user_id
     return jsonify(_user_payload(user)), 200
 
@@ -191,9 +207,7 @@ def logout():
     return jsonify({"message": "Logged out"}), 200
 
 
-# ── Routes ────────────────────────────────────────────────────────────────────
-
-# ---- Students ----------------------------------------------------------------
+# -- Student Routes ------------------------------------------------------------
 
 @app.route("/students", methods=["POST"])
 def create_student():
@@ -222,7 +236,70 @@ def create_student():
     }), 201
 
 
-# ---- Outpasses ---------------------------------------------------------------
+# -- Admin: Register a new student --------------------------------------------
+
+@app.route("/admin/register-student", methods=["POST"])
+def admin_register_student():
+    """
+    Admin endpoint: Warden or HOD registers a new student.
+    Creates both User and Student records in one call.
+    """
+    data = request.get_json(force=True)
+
+    # Check that the caller is a Warden or HOD
+    caller_user_id = data.get("caller_user_id")
+    if caller_user_id:
+        caller = db.session.get(User, caller_user_id)
+        if not caller or caller.role not in {UserRole.Warden, UserRole.HOD}:
+            return jsonify({"error": "Only Wardens or HODs can register students"}), 403
+
+    required = ("name", "email", "password", "roll_no", "department",
+                "hostel_id", "room_id", "contact_no")
+    missing = [f for f in required if f not in data]
+    if missing:
+        return jsonify({"error": f"Missing fields: {', '.join(missing)}"}), 400
+
+    # Check if email already exists
+    if User.query.filter_by(email=data["email"].strip().lower()).first():
+        return jsonify({"error": "Email already registered"}), 409
+
+    # Check if roll_no already exists
+    if Student.query.filter_by(roll_no=data["roll_no"]).first():
+        return jsonify({"error": "Roll number already registered"}), 409
+
+    # Create User
+    user = User(
+        email=data["email"].strip().lower(),
+        role=UserRole.Student,
+        name=data["name"],
+    )
+    user.set_password(data["password"])
+    db.session.add(user)
+    db.session.flush()
+
+    # Create Student
+    student = Student(
+        user_id=user.user_id,
+        name=data["name"],
+        roll_no=data["roll_no"],
+        room_id=data["room_id"],
+        hostel_id=data["hostel_id"],
+        contact_no=data["contact_no"],
+        mentor_id=data.get("mentor_id"),
+        department=data["department"],
+    )
+    db.session.add(student)
+    db.session.commit()
+
+    return jsonify({
+        "message": "Student registered successfully",
+        "student_id": student.student_id,
+        "user_id": user.user_id,
+        "email": user.email,
+    }), 201
+
+
+# -- Outpass Routes ------------------------------------------------------------
 
 @app.route("/outpasses", methods=["POST"])
 def create_outpass():
@@ -240,19 +317,27 @@ def create_outpass():
     if not student:
         return jsonify({"error": "Student not found"}), 404
 
+    departure = datetime.fromisoformat(data["requested_departure"])
+    return_dt = datetime.fromisoformat(data["requested_return"])
+    leave_days = (return_dt.date() - departure.date()).days
+
     outpass = Outpass(
         student_id=data["student_id"],
         reason=data["reason"],
         destination=data["destination"],
-        requested_departure=datetime.fromisoformat(data["requested_departure"]),
-        requested_return=datetime.fromisoformat(data["requested_return"]),
+        requested_departure=departure,
+        requested_return=return_dt,
         status=OutpassStatus.Pending,
+        mentor_approved=False,
+        warden_approved=False,
+        hod_approved=None if leave_days <= 7 else False,
     )
     db.session.add(outpass)
     db.session.commit()
     return jsonify({
         "message": "Outpass request created",
         "outpass_id": outpass.outpass_id,
+        "requires_hod": leave_days > 7,
     }), 201
 
 
@@ -272,9 +357,11 @@ def student_outpasses(student_id):
     return jsonify([_outpass_to_dict(op) for op in outpasses]), 200
 
 
+# -- Pending outpasses for each role -------------------------------------------
+
 @app.route("/outpasses/pending/<int:hostel_id>", methods=["GET"])
-def pending_outpasses(hostel_id):
-    """Warden views pending outpass requests for their hostel."""
+def pending_outpasses_warden(hostel_id):
+    """Warden views outpasses needing their approval for their hostel."""
     hostel = db.session.get(Hostel, hostel_id)
     if not hostel:
         return jsonify({"error": "Hostel not found"}), 404
@@ -284,7 +371,8 @@ def pending_outpasses(hostel_id):
         .join(Student)
         .filter(
             Student.hostel_id == hostel_id,
-            Outpass.status == OutpassStatus.Pending,
+            Outpass.status.in_([OutpassStatus.Pending, OutpassStatus.PartiallyApproved]),
+            Outpass.warden_approved == False,
         )
         .order_by(Outpass.requested_departure.asc())
         .all()
@@ -294,7 +382,7 @@ def pending_outpasses(hostel_id):
 
 @app.route("/outpasses/pending/mentor/<int:mentor_id>", methods=["GET"])
 def mentor_pending_outpasses(mentor_id):
-    """Mentor views pending outpass requests from their mentees only."""
+    """Mentor views outpasses needing their approval from their mentees."""
     mentor = db.session.get(Mentor, mentor_id)
     if not mentor:
         return jsonify({"error": "Mentor not found"}), 404
@@ -304,13 +392,41 @@ def mentor_pending_outpasses(mentor_id):
         .join(Student)
         .filter(
             Student.mentor_id == mentor_id,
-            Outpass.status == OutpassStatus.Pending,
+            Outpass.status.in_([OutpassStatus.Pending, OutpassStatus.PartiallyApproved]),
+            Outpass.mentor_approved == False,
         )
         .order_by(Outpass.requested_departure.asc())
         .all()
     )
     return jsonify([_outpass_to_dict(op) for op in outpasses]), 200
 
+
+@app.route("/outpasses/pending/department/<department>", methods=["GET"])
+def department_pending_outpasses(department):
+    """
+    HOD views outpasses needing their approval.
+    Only shows outpasses that:
+      1. Are > 7 days
+      2. Both mentor AND warden have already approved
+      3. HOD has NOT yet approved
+    """
+    outpasses = (
+        Outpass.query
+        .join(Student)
+        .filter(
+            Student.department == department,
+            Outpass.status == OutpassStatus.PartiallyApproved,
+            Outpass.mentor_approved == True,
+            Outpass.warden_approved == True,
+            Outpass.hod_approved == False,
+        )
+        .order_by(Outpass.requested_departure.asc())
+        .all()
+    )
+    return jsonify([_outpass_to_dict(op) for op in outpasses]), 200
+
+
+# -- All outpasses for each role (history) -------------------------------------
 
 @app.route("/outpasses/mentor/<int:mentor_id>", methods=["GET"])
 def mentor_all_outpasses(mentor_id):
@@ -329,22 +445,6 @@ def mentor_all_outpasses(mentor_id):
     return jsonify([_outpass_to_dict(op) for op in outpasses]), 200
 
 
-@app.route("/outpasses/pending/department/<department>", methods=["GET"])
-def department_pending_outpasses(department):
-    """HOD views pending outpass requests from all students in their department."""
-    outpasses = (
-        Outpass.query
-        .join(Student)
-        .filter(
-            Student.department == department,
-            Outpass.status == OutpassStatus.Pending,
-        )
-        .order_by(Outpass.requested_departure.asc())
-        .all()
-    )
-    return jsonify([_outpass_to_dict(op) for op in outpasses]), 200
-
-
 @app.route("/outpasses/department/<department>", methods=["GET"])
 def department_all_outpasses(department):
     """HOD views all outpass history for students in their department."""
@@ -358,15 +458,44 @@ def department_all_outpasses(department):
     return jsonify([_outpass_to_dict(op) for op in outpasses]), 200
 
 
+@app.route("/outpasses/hostel/<int:hostel_id>", methods=["GET"])
+def hostel_all_outpasses(hostel_id):
+    """Warden views all outpass history for their hostel."""
+    hostel = db.session.get(Hostel, hostel_id)
+    if not hostel:
+        return jsonify({"error": "Hostel not found"}), 404
+
+    outpasses = (
+        Outpass.query
+        .join(Student)
+        .filter(Student.hostel_id == hostel_id)
+        .order_by(Outpass.requested_departure.desc())
+        .all()
+    )
+    return jsonify([_outpass_to_dict(op) for op in outpasses]), 200
+
+
+# -- Approve / Reject (Multi-Level) -------------------------------------------
+
 @app.route("/outpasses/<int:outpass_id>/approve", methods=["POST"])
 def approve_outpass(outpass_id):
-    """Warden, Mentor, or HOD approves an outpass."""
+    """
+    Multi-level approval:
+      - Mentor approves -> sets mentor_approved = True
+      - Warden approves -> sets warden_approved = True
+      - HOD approves (only for > 7 days, after mentor+warden) -> sets hod_approved = True
+      - Status becomes Approved ONLY when ALL required approvals are in.
+      - Until then, status is PartiallyApproved.
+    """
     outpass = db.session.get(Outpass, outpass_id)
     if not outpass:
         return jsonify({"error": "Outpass not found"}), 404
 
-    if outpass.approval:
-        return jsonify({"error": "Outpass already has a decision"}), 409
+    if outpass.status == OutpassStatus.Rejected:
+        return jsonify({"error": "Outpass has already been rejected"}), 409
+
+    if outpass.status == OutpassStatus.Approved:
+        return jsonify({"error": "Outpass is already fully approved"}), 409
 
     data = request.get_json(force=True)
     user_id = data.get("user_id")
@@ -377,34 +506,76 @@ def approve_outpass(outpass_id):
     if not user:
         return jsonify({"error": "User not found"}), 404
 
-    allowed_roles = {UserRole.Warden, UserRole.Mentor, UserRole.HOD}
-    if user.role not in allowed_roles:
-        return jsonify({"error": f"Role '{user.role.value}' is not authorized to approve outpasses"}), 403
+    role = user.role
+    remark = data.get("remark")
 
-    outpass.status = OutpassStatus.Approved
-    outpass.warden_remark = data.get("remark")
+    # Check role is allowed to approve
+    if role == UserRole.Mentor:
+        if outpass.mentor_approved:
+            return jsonify({"error": "Mentor has already approved this outpass"}), 409
+        outpass.mentor_approved = True
 
+    elif role == UserRole.Warden:
+        if outpass.warden_approved:
+            return jsonify({"error": "Warden has already approved this outpass"}), 409
+        outpass.warden_approved = True
+
+    elif role == UserRole.HOD:
+        if not outpass.requires_hod:
+            return jsonify({"error": "HOD approval is not required for leave <= 7 days"}), 400
+        if not outpass.mentor_approved or not outpass.warden_approved:
+            return jsonify({"error": "Mentor and Warden must approve before HOD"}), 400
+        if outpass.hod_approved:
+            return jsonify({"error": "HOD has already approved this outpass"}), 409
+        outpass.hod_approved = True
+
+    else:
+        return jsonify({"error": f"Role '{role.value}' cannot approve outpasses"}), 403
+
+    # Create approval record
     approval = Approval(
         outpass_id=outpass_id,
         approved_by=user_id,
-        approver_role=user.role.value,
+        approver_role=role.value,
         decision=ApprovalDecision.Approved,
+        remark=remark,
         decided_at=_now(),
     )
     db.session.add(approval)
+
+    # Update outpass status
+    if outpass.is_fully_approved:
+        outpass.status = OutpassStatus.Approved
+        if remark:
+            outpass.remark = remark
+    else:
+        outpass.status = OutpassStatus.PartiallyApproved
+
     db.session.commit()
-    return jsonify({"message": "Outpass approved", "approval_id": approval.approval_id}), 200
+
+    return jsonify({
+        "message": f"Outpass approved by {role.value}",
+        "approval_id": approval.approval_id,
+        "status": outpass.status.value,
+        "mentor_approved": outpass.mentor_approved,
+        "warden_approved": outpass.warden_approved,
+        "hod_approved": outpass.hod_approved,
+        "is_fully_approved": outpass.is_fully_approved,
+    }), 200
 
 
 @app.route("/outpasses/<int:outpass_id>/reject", methods=["POST"])
 def reject_outpass(outpass_id):
-    """Warden, Mentor, or HOD rejects an outpass."""
+    """Any approver (Mentor/Warden/HOD) can reject -- immediately sets status to Rejected."""
     outpass = db.session.get(Outpass, outpass_id)
     if not outpass:
         return jsonify({"error": "Outpass not found"}), 404
 
-    if outpass.approval:
-        return jsonify({"error": "Outpass already has a decision"}), 409
+    if outpass.status == OutpassStatus.Rejected:
+        return jsonify({"error": "Outpass is already rejected"}), 409
+
+    if outpass.status == OutpassStatus.Approved:
+        return jsonify({"error": "Cannot reject an already approved outpass"}), 409
 
     data = request.get_json(force=True)
     user_id = data.get("user_id")
@@ -417,24 +588,30 @@ def reject_outpass(outpass_id):
 
     allowed_roles = {UserRole.Warden, UserRole.Mentor, UserRole.HOD}
     if user.role not in allowed_roles:
-        return jsonify({"error": f"Role '{user.role.value}' is not authorized to reject outpasses"}), 403
+        return jsonify({"error": f"Role '{user.role.value}' cannot reject outpasses"}), 403
 
     outpass.status = OutpassStatus.Rejected
-    outpass.warden_remark = data.get("remark")
+    remark = data.get("remark")
+    if remark:
+        outpass.remark = remark
 
     approval = Approval(
         outpass_id=outpass_id,
         approved_by=user_id,
         approver_role=user.role.value,
         decision=ApprovalDecision.Rejected,
+        remark=remark,
         decided_at=_now(),
     )
     db.session.add(approval)
     db.session.commit()
-    return jsonify({"message": "Outpass rejected", "approval_id": approval.approval_id}), 200
+    return jsonify({
+        "message": "Outpass rejected",
+        "approval_id": approval.approval_id,
+    }), 200
 
 
-# ---- Gate Log ----------------------------------------------------------------
+# -- Gate Log ------------------------------------------------------------------
 
 @app.route("/gatelog/<int:outpass_id>/exit", methods=["POST"])
 def log_exit(outpass_id):
@@ -443,10 +620,9 @@ def log_exit(outpass_id):
     if not outpass:
         return jsonify({"error": "Outpass not found"}), 404
 
-    # Business rule: only Approved outpasses can have a gate log
     if outpass.status != OutpassStatus.Approved:
         return jsonify({
-            "error": f"Cannot log exit — outpass status is '{outpass.status.value}', must be 'Approved'"
+            "error": f"Cannot log exit -- outpass status is '{outpass.status.value}', must be 'Approved'"
         }), 403
 
     if outpass.gate_log:
@@ -477,7 +653,7 @@ def log_exit(outpass_id):
 
 @app.route("/gatelog/<int:outpass_id>/return", methods=["POST"])
 def log_return(outpass_id):
-    """Security staff logs the actual return time."""
+    """Security staff logs the actual return time (with 30-min anti-cheat gap)."""
     outpass = db.session.get(Outpass, outpass_id)
     if not outpass:
         return jsonify({"error": "Outpass not found"}), 404
@@ -487,6 +663,20 @@ def log_return(outpass_id):
 
     if outpass.gate_log.actual_return_time:
         return jsonify({"error": "Return already logged for this outpass"}), 409
+
+    # Anti-cheat: minimum 30 minutes between exit and return
+    exit_time = outpass.gate_log.actual_exit_time
+    if exit_time:
+        if exit_time.tzinfo is None:
+            exit_time = exit_time.replace(tzinfo=timezone.utc)
+        now = _now()
+        elapsed = (now - exit_time).total_seconds() / 60
+        if elapsed < MIN_RETURN_GAP_MINUTES:
+            remaining = int(MIN_RETURN_GAP_MINUTES - elapsed)
+            return jsonify({
+                "error": f"Return cannot be logged within {MIN_RETURN_GAP_MINUTES} minutes of exit. "
+                         f"Please wait {remaining} more minute(s)."
+            }), 400
 
     data = request.get_json(force=True)
     staff_id = data.get("staff_id")
@@ -504,7 +694,7 @@ def log_return(outpass_id):
     }), 200
 
 
-# ---- Reports -----------------------------------------------------------------
+# -- Reports -------------------------------------------------------------------
 
 @app.route("/reports/overdue/<int:hostel_id>", methods=["GET"])
 def overdue_report(hostel_id):
@@ -515,7 +705,6 @@ def overdue_report(hostel_id):
 
     now = _now()
 
-    # Approved outpasses for this hostel that have a gate log with an exit
     outpasses = (
         Outpass.query
         .join(Student)
@@ -524,7 +713,7 @@ def overdue_report(hostel_id):
             Student.hostel_id == hostel_id,
             Outpass.status == OutpassStatus.Approved,
             GateLog.actual_exit_time.isnot(None),
-            GateLog.actual_return_time.is_(None),  # still out
+            GateLog.actual_return_time.is_(None),
         )
         .all()
     )
@@ -560,7 +749,7 @@ def mentor_overdue_report(mentor_id):
             Student.mentor_id == mentor_id,
             Outpass.status == OutpassStatus.Approved,
             GateLog.actual_exit_time.isnot(None),
-            GateLog.actual_return_time.is_(None),  # still out
+            GateLog.actual_return_time.is_(None),
         )
         .all()
     )
@@ -592,7 +781,7 @@ def department_overdue_report(department):
             Student.department == department,
             Outpass.status == OutpassStatus.Approved,
             GateLog.actual_exit_time.isnot(None),
-            GateLog.actual_return_time.is_(None),  # still out
+            GateLog.actual_return_time.is_(None),
         )
         .all()
     )
@@ -611,7 +800,7 @@ def department_overdue_report(department):
     return jsonify(overdue), 200
 
 
-# ── Entrypoint ────────────────────────────────────────────────────────────────
+# -- Entrypoint ----------------------------------------------------------------
 
 if __name__ == "__main__":
     with app.app_context():
