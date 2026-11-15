@@ -26,23 +26,13 @@ function getTodayDateStr(offsetDays = 0) {
   return d.toISOString().split('T')[0];
 }
 
-function getCurrentTimeStr(offsetHours = 0) {
-  const d = new Date();
-  d.setHours(d.getHours() + offsetHours);
-  const h = String(d.getHours()).padStart(2, '0');
-  const m = String(d.getMinutes()).padStart(2, '0');
-  return `${h}:${m}`;
-}
-
 /* ── New Request form ──────────────────────────── */
 function NewRequest({ studentId }) {
   const [form, setForm] = useState({
     reason: '',
     destination: '',
     depDate: getTodayDateStr(0),
-    depTime: getCurrentTimeStr(1),
     retDate: getTodayDateStr(1),
-    retTime: '18:00',
   });
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState(null);
@@ -54,8 +44,8 @@ function NewRequest({ studentId }) {
     setMsg(null);
     setErr(null);
     try {
-      const departureIso = `${form.depDate}T${form.depTime || '09:00'}`;
-      const returnIso = `${form.retDate}T${form.retTime || '18:00'}`;
+      const departureIso = `${form.depDate}T00:00:00`;
+      const returnIso = `${form.retDate}T23:59:59`;
 
       const res = await api.createOutpass({
         student_id: studentId,
@@ -69,9 +59,7 @@ function NewRequest({ studentId }) {
         reason: '',
         destination: '',
         depDate: getTodayDateStr(0),
-        depTime: getCurrentTimeStr(1),
         retDate: getTodayDateStr(1),
-        retTime: '18:00',
       });
     } catch (e) {
       setErr(e.message);
@@ -115,46 +103,24 @@ function NewRequest({ studentId }) {
 
         <div className="form-row">
           <div className="form-group form-group--half">
-            <label className="form-label">Departure Date &amp; Time</label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input
-                className="form-input"
-                type="date"
-                style={{ flex: 1.4 }}
-                value={form.depDate}
-                onChange={(e) => setForm({ ...form, depDate: e.target.value })}
-                required
-              />
-              <input
-                className="form-input"
-                type="time"
-                style={{ flex: 1 }}
-                value={form.depTime}
-                onChange={(e) => setForm({ ...form, depTime: e.target.value })}
-                required
-              />
-            </div>
+            <label className="form-label">Departure Date</label>
+            <input
+              className="form-input"
+              type="date"
+              value={form.depDate}
+              onChange={(e) => setForm({ ...form, depDate: e.target.value })}
+              required
+            />
           </div>
           <div className="form-group form-group--half">
-            <label className="form-label">Expected Return Date &amp; Time</label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input
-                className="form-input"
-                type="date"
-                style={{ flex: 1.4 }}
-                value={form.retDate}
-                onChange={(e) => setForm({ ...form, retDate: e.target.value })}
-                required
-              />
-              <input
-                className="form-input"
-                type="time"
-                style={{ flex: 1 }}
-                value={form.retTime}
-                onChange={(e) => setForm({ ...form, retTime: e.target.value })}
-                required
-              />
-            </div>
+            <label className="form-label">Expected Return Date</label>
+            <input
+              className="form-input"
+              type="date"
+              value={form.retDate}
+              onChange={(e) => setForm({ ...form, retDate: e.target.value })}
+              required
+            />
           </div>
         </div>
 
@@ -187,8 +153,7 @@ function MyOutpasses({ studentId }) {
 
   const fmtDate = (iso) => {
     const d = new Date(iso);
-    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) +
-      ', ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
   return (

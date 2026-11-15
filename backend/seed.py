@@ -30,6 +30,17 @@ def seed():
         now = datetime.now(timezone.utc)
 
         # ==============================================================
+        #  SYSTEM ADMIN (first admin -- can create all other users)
+        # ==============================================================
+        admin_user = User(
+            email="admin@hostelout.com",
+            role=UserRole.Admin,
+            name="System Admin",
+        )
+        admin_user.set_password("admin123")
+        db.session.add(admin_user)
+
+        # ==============================================================
         #  USER ACCOUNTS
         # ==============================================================
 
@@ -327,6 +338,8 @@ def seed():
             print(f"     {email:<35} ({roll_no}, {dept})")
         print()
         print("   Security: security.desk@gmail.com / security123")
+        print()
+        print("   ★ Admin: admin@hostelout.com / admin123")
 
 
 if __name__ == "__main__":

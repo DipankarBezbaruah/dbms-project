@@ -6,6 +6,7 @@ import WardenDashboard from './pages/WardenDashboard';
 import MentorDashboard from './pages/MentorDashboard';
 import HodDashboard from './pages/HodDashboard';
 import SecurityDesk from './pages/SecurityDesk';
+import AdminDashboard from './pages/AdminDashboard';
 
 /**
  * Route guard: only renders children if the user is logged in
@@ -73,6 +74,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute role="Security">
             <SecurityDesk />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/*"
+        element={
+          <ProtectedRoute role="Admin">
+            <AdminDashboard />
           </ProtectedRoute>
         }
       />

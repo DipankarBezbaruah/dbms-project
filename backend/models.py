@@ -15,6 +15,7 @@ class UserRole(enum.Enum):
     Warden = "Warden"
     HOD = "HOD"
     Security = "Security"
+    Admin = "Admin"
 
 
 class OutpassStatus(enum.Enum):

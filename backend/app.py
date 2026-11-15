@@ -250,11 +250,11 @@ def admin_register_student():
     caller_user_id = data.get("caller_user_id")
     if caller_user_id:
         caller = db.session.get(User, caller_user_id)
-        if not caller or caller.role not in {UserRole.Warden, UserRole.HOD}:
-            return jsonify({"error": "Only Wardens or HODs can register students"}), 403
+        if not caller or caller.role not in {UserRole.Warden, UserRole.HOD, UserRole.Admin}:
+            return jsonify({"error": "Only Wardens, HODs, or Admins can register students"}), 403
 
     required = ("name", "email", "password", "roll_no", "department",
-                "hostel_id", "room_id", "contact_no")
+                "hostel_id", "room_no", "contact_no", "mentor_id")
     missing = [f for f in required if f not in data]
     if missing:
         return jsonify({"error": f"Missing fields: {', '.join(missing)}"}), 400
@@ -266,6 +266,23 @@ def admin_register_student():
     # Check if roll_no already exists
     if Student.query.filter_by(roll_no=data["roll_no"]).first():
         return jsonify({"error": "Roll number already registered"}), 409
+
+    # Find or create the room in the given hostel
+    hostel_id = data["hostel_id"]
+    room_no = str(data["room_no"]).strip().upper().replace(" ", "")
+    room = Room.query.filter_by(hostel_id=hostel_id, room_no=room_no).first()
+    if not room:
+        room = Room(hostel_id=hostel_id, room_no=room_no)
+        db.session.add(room)
+        db.session.flush()
+    else:
+        # Check room capacity (max 1 student per room)
+        current_occupants = Student.query.filter_by(room_id=room.room_id).count()
+        if current_occupants >= 1:
+            return jsonify({
+                "error": f"Room {room_no} is already occupied. "
+                         f"Please assign a different room."
+            }), 409
 
     # Create User
     user = User(
@@ -282,10 +299,10 @@ def admin_register_student():
         user_id=user.user_id,
         name=data["name"],
         roll_no=data["roll_no"],
-        room_id=data["room_id"],
-        hostel_id=data["hostel_id"],
+        room_id=room.room_id,
+        hostel_id=hostel_id,
         contact_no=data["contact_no"],
-        mentor_id=data.get("mentor_id"),
+        mentor_id=data["mentor_id"],
         department=data["department"],
     )
     db.session.add(student)
@@ -798,6 +815,151 @@ def department_overdue_report(department):
             overdue.append(d)
 
     return jsonify(overdue), 200
+
+
+# -- Lookup data (for registration form dropdowns) ----------------------------
+
+@app.route("/hostels", methods=["GET"])
+def list_hostels():
+    """Return all hostels with their rooms."""
+    hostels = Hostel.query.all()
+    result = []
+    for h in hostels:
+        result.append({
+            "hostel_id": h.hostel_id,
+            "hostel_name": h.hostel_name,
+            "rooms": [
+                {"room_id": r.room_id, "room_no": r.room_no}
+                for r in h.rooms
+            ],
+        })
+    return jsonify(result), 200
+
+
+@app.route("/mentors", methods=["GET"])
+def list_mentors():
+    """Return all mentors."""
+    mentors = Mentor.query.all()
+    return jsonify([
+        {
+            "mentor_id": m.mentor_id,
+            "name": m.user.name,
+            "department": m.department,
+        }
+        for m in mentors
+    ]), 200
+
+
+# -- Admin: Register any staff / admin -----------------------------------------
+
+@app.route("/admin/register-staff", methods=["POST"])
+def admin_register_staff():
+    """
+    Admin endpoint: Register a new Warden, Mentor, HOD, Security Staff, or Admin.
+    Only accessible by users with Admin role.
+    """
+    data = request.get_json(force=True)
+
+    # Check that the caller is an Admin
+    caller_user_id = data.get("caller_user_id")
+    if not caller_user_id:
+        return jsonify({"error": "caller_user_id is required"}), 400
+
+    caller = db.session.get(User, caller_user_id)
+    if not caller or caller.role != UserRole.Admin:
+        return jsonify({"error": "Only Admins can register staff"}), 403
+
+    required = ("name", "email", "password", "role")
+    missing = [f for f in required if f not in data]
+    if missing:
+        return jsonify({"error": f"Missing fields: {', '.join(missing)}"}), 400
+
+    target_role = data["role"]
+    valid_roles = {"Warden", "Mentor", "HOD", "Security", "Admin"}
+    if target_role not in valid_roles:
+        return jsonify({"error": f"Invalid role. Must be one of: {', '.join(sorted(valid_roles))}"}), 400
+
+    # Check if email already exists
+    if User.query.filter_by(email=data["email"].strip().lower()).first():
+        return jsonify({"error": "Email already registered"}), 409
+
+    # Create User
+    user = User(
+        email=data["email"].strip().lower(),
+        role=UserRole[target_role],
+        name=data["name"],
+    )
+    user.set_password(data["password"])
+    db.session.add(user)
+    db.session.flush()
+
+    result = {
+        "message": f"{target_role} registered successfully",
+        "user_id": user.user_id,
+        "email": user.email,
+        "role": target_role,
+    }
+
+    # Create role-specific record
+    if target_role == "Warden":
+        contact_no = data.get("contact_no", "")
+        if not contact_no:
+            return jsonify({"error": "contact_no is required for Warden"}), 400
+        warden = Warden(
+            user_id=user.user_id,
+            name=data["name"],
+            contact_no=contact_no,
+        )
+        db.session.add(warden)
+        db.session.flush()
+
+        # If hostel_id is provided, assign the warden to that hostel
+        hostel_id = data.get("hostel_id")
+        if hostel_id:
+            hostel = db.session.get(Hostel, hostel_id)
+            if hostel:
+                hostel.warden_id = warden.warden_id
+        result["warden_id"] = warden.warden_id
+
+    elif target_role == "Mentor":
+        department = data.get("department")
+        if not department:
+            return jsonify({"error": "department is required for Mentor"}), 400
+        mentor = Mentor(
+            user_id=user.user_id,
+            department=department,
+        )
+        db.session.add(mentor)
+        db.session.flush()
+        result["mentor_id"] = mentor.mentor_id
+
+    elif target_role == "HOD":
+        department = data.get("department")
+        if not department:
+            return jsonify({"error": "department is required for HOD"}), 400
+        hod = HOD(
+            user_id=user.user_id,
+            department=department,
+        )
+        db.session.add(hod)
+        db.session.flush()
+        result["hod_id"] = hod.hod_id
+
+    elif target_role == "Security":
+        shift = data.get("shift", "General")
+        security = SecurityStaff(
+            user_id=user.user_id,
+            name=data["name"],
+            shift=shift,
+        )
+        db.session.add(security)
+        db.session.flush()
+        result["staff_id"] = security.staff_id
+
+    # Admin role doesn't need an extra table record
+
+    db.session.commit()
+    return jsonify(result), 201
 
 
 # -- Entrypoint ----------------------------------------------------------------

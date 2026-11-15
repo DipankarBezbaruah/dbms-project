@@ -226,3 +226,83 @@
   background: var(--burnt-orange-bg);
   color: var(--burnt-orange);
 }
+
+/* ── Register Student Form ────────────────────── */
+.register-form-container {
+  flex: 1;
+  max-width: 680px;
+  padding: 24px 28px;
+  overflow-y: auto;
+}
+
+.register-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.register-form__row {
+  display: flex;
+  gap: 16px;
+}
+
+.register-form__row > * {
+  flex: 1;
+}
+
+.register-form__label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
+}
+
+.register-form__input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xs);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.9rem;
+  transition: border-color 0.15s;
+}
+
+.register-form__input:focus {
+  outline: none;
+  border-color: var(--terracotta);
+  box-shadow: 0 0 0 2px var(--terracotta-bg);
+}
+
+.register-form__input::placeholder {
+  color: var(--brown-300);
+}
+
+select.register-form__input {
+  cursor: pointer;
+}
+
+.btn--register {
+  margin-top: 8px;
+  padding: 12px 24px;
+  background: var(--terracotta);
+  color: #fff;
+  border-radius: var(--radius-xs);
+  font-weight: 700;
+  font-size: 0.93rem;
+  letter-spacing: 0.4px;
+  transition: all 0.15s;
+  cursor: pointer;
+}
+
+.btn--register:hover {
+  background: var(--brown-700);
+}
+
+.btn--register:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

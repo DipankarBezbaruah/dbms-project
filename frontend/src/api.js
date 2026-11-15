@@ -48,6 +48,12 @@ export const api = {
   logReturn: (outpassId, staffId) =>
     request('POST', `/gatelog/${outpassId}/return`, { staff_id: staffId }),
 
+  // Admin
+  registerStudent: (body) => request('POST', '/admin/register-student', body),
+  registerStaff: (body) => request('POST', '/admin/register-staff', body),
+  getHostels: () => request('GET', '/hostels'),
+  getMentors: () => request('GET', '/mentors'),
+
   // Reports
   getOverdueReport: (hostelId) => request('GET', `/reports/overdue/${hostelId}`),
   getMentorOverdueReport: (mentorId) => request('GET', `/reports/overdue/mentor/${mentorId}`),

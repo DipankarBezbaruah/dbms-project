@@ -28,8 +28,8 @@ export default function SecurityDesk() {
       setResult({
         type: 'success',
         text: action === 'exit'
-          ? `Exit logged at ${new Date(res.actual_exit_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}`
-          : `Return logged at ${new Date(res.actual_return_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}`,
+          ? `Exit logged at ${new Date(res.actual_exit_time).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}`
+          : `Return logged at ${new Date(res.actual_return_time).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}`,
       });
     } catch (e) {
       setResult({ type: 'error', text: e.message });

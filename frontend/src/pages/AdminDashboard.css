@@ -1,0 +1,110 @@
+/* ── Admin content layout ──────────────────────── */
+.admin-content {
+  display: flex;
+  flex: 1;
+  min-height: calc(100vh - var(--topbar-height));
+}
+
+.admin-form-container {
+  flex: 1;
+  max-width: 680px;
+  padding: 24px 28px;
+  overflow-y: auto;
+}
+
+.admin-section-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 20px;
+}
+
+.admin-section-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: var(--text-light);
+}
+
+.admin-section-hint {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+/* ── Form ──────────────────────────────────────── */
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-form__row {
+  display: flex;
+  gap: 16px;
+}
+
+.admin-form__row > * {
+  flex: 1;
+}
+
+.admin-form__label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
+}
+
+.admin-form__input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xs);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.9rem;
+  transition: border-color 0.15s;
+}
+
+.admin-form__input:focus {
+  outline: none;
+  border-color: var(--terracotta);
+  box-shadow: 0 0 0 2px var(--terracotta-bg);
+}
+
+.admin-form__input::placeholder {
+  color: var(--brown-300);
+}
+
+select.admin-form__input {
+  cursor: pointer;
+}
+
+.btn--admin-register {
+  margin-top: 8px;
+  padding: 12px 24px;
+  background: var(--terracotta);
+  color: #fff;
+  border-radius: var(--radius-xs);
+  font-weight: 700;
+  font-size: 0.93rem;
+  letter-spacing: 0.4px;
+  transition: all 0.15s;
+  cursor: pointer;
+}
+
+.btn--admin-register:hover {
+  background: var(--brown-700);
+}
+
+.btn--admin-register:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── no-pad override ───────────────────────────── */
+.dashboard__content--no-pad {
+  padding: 0;
+}

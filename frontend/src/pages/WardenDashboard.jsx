@@ -20,6 +20,12 @@ const IconChart = (
     <rect x="17" y="3" width="4" height="18" rx="1"/>
   </svg>
 );
+const IconUserPlus = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/>
+    <line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/>
+  </svg>
+);
 
 function getInitials(name) {
   return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
@@ -241,6 +247,168 @@ function Overview({ hostelId }) {
   );
 }
 
+/* ── Register Student Form ──────────────────────── */
+function RegisterStudent({ userId, hostelId }) {
+  const [hostels, setHostels] = useState([]);
+  const [mentors, setMentors] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    roll_no: '',
+    department: 'CSE',
+    hostel_id: hostelId || '',
+    room_no: '',
+    contact_no: '',
+    mentor_id: '',
+  });
+
+  useEffect(() => {
+    Promise.all([api.getHostels(), api.getMentors()])
+      .then(([h, m]) => {
+        setHostels(h);
+        setMentors(m);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [hostelId]);
+
+  const handleChange = (e) => {
+    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setMsg(null);
+    try {
+      const body = {
+        ...form,
+        hostel_id: parseInt(form.hostel_id),
+        room_no: form.room_no,
+        mentor_id: parseInt(form.mentor_id),
+        caller_user_id: userId,
+      };
+      const res = await api.registerStudent(body);
+      setMsg({ type: 'success', text: `✅ Student "${form.name}" registered successfully! (ID: ${res.student_id})` });
+      setForm({
+        name: '', email: '', password: '', roll_no: '',
+        department: 'CSE', hostel_id: hostelId || '', room_no: '',
+        contact_no: '', mentor_id: '',
+      });
+    } catch (err) {
+      setMsg({ type: 'error', text: err.message });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) return <div className="loading">Loading...</div>;
+
+  return (
+    <div className="warden-content">
+      <div className="register-form-container">
+        <div className="warden-queue__header">
+          <span className="warden-queue__title">REGISTER NEW STUDENT</span>
+        </div>
+
+        {msg && (
+          <div className={`alert alert--${msg.type}`} style={{ marginBottom: 16 }}>
+            {msg.text}
+          </div>
+        )}
+
+        <form className="register-form" onSubmit={handleSubmit}>
+          <div className="register-form__row">
+            <label className="register-form__label">
+              Full Name *
+              <input className="register-form__input" name="name" value={form.name}
+                onChange={handleChange} placeholder="Enter student full name" required />
+            </label>
+            <label className="register-form__label">
+              Email *
+              <input className="register-form__input" name="email" type="email" value={form.email}
+                onChange={handleChange} placeholder="Enter student email" required />
+            </label>
+          </div>
+
+          <div className="register-form__row">
+            <label className="register-form__label">
+              Password *
+              <input className="register-form__input" name="password" type="password" value={form.password}
+                onChange={handleChange} placeholder="Set a password" required />
+            </label>
+            <label className="register-form__label">
+              Roll Number *
+              <input className="register-form__input" name="roll_no" value={form.roll_no}
+                onChange={handleChange} placeholder="Enter roll number" required />
+            </label>
+          </div>
+
+          <div className="register-form__row">
+            <label className="register-form__label">
+              Department *
+              <select className="register-form__input" name="department" value={form.department}
+                onChange={handleChange} required>
+                <option value="CSE">CSE</option>
+                <option value="ECE">ECE</option>
+                <option value="ME">ME</option>
+                <option value="CE">CE</option>
+                <option value="FET">FET</option>
+              </select>
+            </label>
+            <label className="register-form__label">
+              Contact Number *
+              <input className="register-form__input" name="contact_no" value={form.contact_no}
+                onChange={handleChange} placeholder="Enter contact number" required />
+            </label>
+          </div>
+
+          <div className="register-form__row">
+            <label className="register-form__label">
+              Hostel *
+              <select className="register-form__input" name="hostel_id" value={form.hostel_id}
+                onChange={handleChange} required>
+                <option value="">Select Hostel</option>
+                {hostels.map(h => (
+                  <option key={h.hostel_id} value={h.hostel_id}>{h.hostel_name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="register-form__label">
+              Room No *
+              <input className="register-form__input" name="room_no" value={form.room_no}
+                onChange={handleChange} placeholder="Enter room number" required />
+            </label>
+          </div>
+
+          <div className="register-form__row">
+            <label className="register-form__label">
+              Mentor *
+              <select className="register-form__input" name="mentor_id" value={form.mentor_id}
+                onChange={handleChange} required>
+                <option value="">Select Mentor</option>
+                {mentors.map(m => (
+                  <option key={m.mentor_id} value={m.mentor_id}>{m.name} ({m.department})</option>
+                ))}
+              </select>
+            </label>
+            <div className="register-form__label" />
+          </div>
+
+          <button className="btn btn--register" type="submit" disabled={submitting}>
+            {submitting ? 'Registering...' : '➕ Register Student'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 /* ── Dashboard shell ────────────────────────────── */
 export default function WardenDashboard() {
   const { user, logout } = useAuth();
@@ -266,6 +434,7 @@ export default function WardenDashboard() {
   const sidebarNav = [
     { path: '', label: 'Pending Queue', icon: IconQueue, badge: pendingCount },
     { path: '/overview', label: 'Overdue', icon: IconChart, badge: overdueCount },
+    { path: '/register', label: 'Register Student', icon: IconUserPlus },
   ];
 
   const subNavItems = [
@@ -288,6 +457,16 @@ export default function WardenDashboard() {
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/>
           <rect x="17" y="3" width="4" height="18" rx="1"/>
+        </svg>
+      ),
+    },
+    {
+      path: '/register',
+      label: 'Register Student',
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/>
+          <line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/>
         </svg>
       ),
     },
@@ -317,6 +496,7 @@ export default function WardenDashboard() {
             <Routes>
               <Route path="/" element={<PendingQueue userId={user?.user_id} hostelId={hostelId} />} />
               <Route path="/overview" element={<Overview hostelId={hostelId} />} />
+              <Route path="/register" element={<RegisterStudent userId={user?.user_id} hostelId={hostelId} />} />
               <Route path="*" element={<Navigate to="/warden" replace />} />
             </Routes>
           </div>
