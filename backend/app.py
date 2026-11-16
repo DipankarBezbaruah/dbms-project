@@ -1,5 +1,6 @@
 """HostelOut -- Flask REST API for Digital Outpass & Leave Register."""
 
+import os
 from datetime import datetime, timedelta, timezone
 
 from flask import Flask, request, jsonify, session
@@ -28,8 +29,21 @@ from models import (
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+
+    # Cookie settings for cross-domain deployment (Vercel frontend -> Render backend)
+    app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+    app.config['SESSION_COOKIE_SECURE'] = True
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+
     db.init_app(app)
-    CORS(app, supports_credentials=True)
+
+    # Allow requests from your Vercel frontend
+    allowed_origins = [
+        "http://localhost:5173",                                        # local Vite dev
+        "http://localhost:5000",                                        # local Flask dev
+        os.environ.get("FRONTEND_URL", "http://localhost:5173"),        # production
+    ]
+    CORS(app, supports_credentials=True, origins=allowed_origins)
     return app
 
 
