@@ -37,6 +37,10 @@ def create_app():
 
     db.init_app(app)
 
+    # Auto-create tables on startup (no shell needed)
+    with app.app_context():
+        db.create_all()
+
     # Allow requests from your Vercel frontend
     allowed_origins = [
         "http://localhost:5173",                                        # local Vite dev
@@ -974,6 +978,23 @@ def admin_register_staff():
 
     db.session.commit()
     return jsonify(result), 201
+
+
+# -- One-time Seed Endpoint (visit in browser to populate data) ----------------
+
+@app.route("/seed-database", methods=["GET"])
+def seed_database():
+    """
+    Visit https://your-render-url.onrender.com/seed-database in your browser
+    to populate the database with sample data. Only works if no users exist yet.
+    """
+    # Safety check: only seed if database is empty
+    if User.query.first() is not None:
+        return jsonify({"message": "Database already has data. Seed skipped."}), 200
+
+    from seed import seed
+    seed()
+    return jsonify({"message": "Database seeded successfully!"}), 200
 
 
 # -- Entrypoint ----------------------------------------------------------------
