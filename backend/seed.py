@@ -24,6 +24,11 @@ from models import (
 
 def seed():
     with app.app_context():
+        # Skip if database already has data (prevents re-seeding on every deploy)
+        if User.query.first() is not None:
+            print("[SKIP] Database already has data. Seed skipped.")
+            return
+
         db.drop_all()
         db.create_all()
 

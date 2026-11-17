@@ -980,23 +980,6 @@ def admin_register_staff():
     return jsonify(result), 201
 
 
-# -- One-time Seed Endpoint (visit in browser to populate data) ----------------
-
-@app.route("/seed-database", methods=["GET"])
-def seed_database():
-    """
-    Visit https://your-render-url.onrender.com/seed-database in your browser
-    to populate the database with sample data. Only works if no users exist yet.
-    """
-    # Safety check: only seed if database is empty
-    if User.query.first() is not None:
-        return jsonify({"message": "Database already has data. Seed skipped."}), 200
-
-    from seed import seed
-    seed()
-    return jsonify({"message": "Database seeded successfully!"}), 200
-
-
 # -- Entrypoint ----------------------------------------------------------------
 
 if __name__ == "__main__":
