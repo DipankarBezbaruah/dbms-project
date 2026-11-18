@@ -980,29 +980,45 @@ def admin_register_staff():
     return jsonify(result), 201
 
 
-# -- Seed Endpoint (runs seed.py as separate process to avoid circular imports) --
+# -- Seed Endpoint (with full error handling) ----------------------------------
 
 @app.route("/seed-database", methods=["GET"])
 def seed_database():
     """Visit this URL in browser to populate the database with sample data."""
-    if User.query.first() is not None:
-        return jsonify({"message": "Database already has data. Seed skipped."}), 200
-
+    import sys
     import subprocess
-    result = subprocess.run(
-        ["python", "seed.py"],
-        capture_output=True, text=True, timeout=120
-    )
-    if result.returncode == 0:
+    import traceback
+
+    try:
+        # Check if already seeded
+        count = User.query.count()
+        if count > 0:
+            return jsonify({"message": f"Database already has {count} users. Seed skipped."}), 200
+    except Exception as e:
+        return jsonify({"error": f"DB check failed: {str(e)}"}), 500
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "seed.py"],
+            capture_output=True, text=True, timeout=120,
+            cwd=os.path.dirname(os.path.abspath(__file__))
+        )
+        if result.returncode == 0:
+            return jsonify({
+                "message": "Database seeded successfully!",
+                "output": result.stdout[-1000:] if result.stdout else ""
+            }), 200
+        else:
+            return jsonify({
+                "error": "Seed script failed",
+                "returncode": result.returncode,
+                "stdout": result.stdout[-1000:] if result.stdout else "",
+                "stderr": result.stderr[-1000:] if result.stderr else ""
+            }), 500
+    except Exception as e:
         return jsonify({
-            "message": "Database seeded successfully!",
-            "output": result.stdout[-500:] if result.stdout else ""
-        }), 200
-    else:
-        return jsonify({
-            "error": "Seed failed",
-            "stdout": result.stdout[-500:] if result.stdout else "",
-            "stderr": result.stderr[-500:] if result.stderr else ""
+            "error": f"Exception: {str(e)}",
+            "traceback": traceback.format_exc()
         }), 500
 
 
