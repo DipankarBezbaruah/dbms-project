@@ -2,7 +2,8 @@
 
 from datetime import datetime, timedelta, timezone
 
-from app import app
+from flask import Flask
+from config import Config
 from models import (
     db,
     User,
@@ -22,21 +23,31 @@ from models import (
 )
 
 
-def seed():
+def _create_seed_app():
+    """Create a minimal Flask app just for seeding (avoids circular import with app.py)."""
+    app = Flask(__name__)
+    app.config.from_object(Config)
+    db.init_app(app)
+    return app
+
+
+def seed(app=None):
+    if app is None:
+        app = _create_seed_app()
+
     with app.app_context():
-        # Skip if database already has data (prevents re-seeding on every deploy)
+        # Skip if database already has data
         try:
             if User.query.first() is not None:
                 print("[SKIP] Database already has data. Seed skipped.")
                 return
         except Exception:
-            pass  # Table might not exist yet, continue to create
+            pass
 
-        # Drop all tables and enum types properly for PostgreSQL
+        # Drop and recreate tables (handle PostgreSQL enum types)
         from sqlalchemy import text
         try:
             db.drop_all()
-            # PostgreSQL keeps enum types after drop_all — remove them manually
             for enum_name in ['userrole', 'outpassstatus', 'approvaldecision']:
                 db.session.execute(text(f"DROP TYPE IF EXISTS {enum_name} CASCADE"))
             db.session.commit()

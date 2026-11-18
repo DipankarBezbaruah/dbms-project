@@ -980,17 +980,12 @@ def admin_register_staff():
     return jsonify(result), 201
 
 
-# -- Seed Endpoint (with full error handling) ----------------------------------
+# -- Seed Endpoint -------------------------------------------------------------
 
 @app.route("/seed-database", methods=["GET"])
 def seed_database():
     """Visit this URL in browser to populate the database with sample data."""
-    import sys
-    import subprocess
-    import traceback
-
     try:
-        # Check if already seeded
         count = User.query.count()
         if count > 0:
             return jsonify({"message": f"Database already has {count} users. Seed skipped."}), 200
@@ -998,28 +993,12 @@ def seed_database():
         return jsonify({"error": f"DB check failed: {str(e)}"}), 500
 
     try:
-        result = subprocess.run(
-            [sys.executable, "seed.py"],
-            capture_output=True, text=True, timeout=120,
-            cwd=os.path.dirname(os.path.abspath(__file__))
-        )
-        if result.returncode == 0:
-            return jsonify({
-                "message": "Database seeded successfully!",
-                "output": result.stdout[-1000:] if result.stdout else ""
-            }), 200
-        else:
-            return jsonify({
-                "error": "Seed script failed",
-                "returncode": result.returncode,
-                "stdout": result.stdout[-1000:] if result.stdout else "",
-                "stderr": result.stderr[-1000:] if result.stderr else ""
-            }), 500
+        from seed import seed
+        seed(app)
+        return jsonify({"message": "Database seeded successfully!"}), 200
     except Exception as e:
-        return jsonify({
-            "error": f"Exception: {str(e)}",
-            "traceback": traceback.format_exc()
-        }), 500
+        import traceback
+        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
 
 
 # -- Entrypoint ----------------------------------------------------------------
