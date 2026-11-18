@@ -25,12 +25,27 @@ from models import (
 def seed():
     with app.app_context():
         # Skip if database already has data (prevents re-seeding on every deploy)
-        if User.query.first() is not None:
-            print("[SKIP] Database already has data. Seed skipped.")
-            return
+        try:
+            if User.query.first() is not None:
+                print("[SKIP] Database already has data. Seed skipped.")
+                return
+        except Exception:
+            pass  # Table might not exist yet, continue to create
 
-        db.drop_all()
+        # Drop all tables and enum types properly for PostgreSQL
+        from sqlalchemy import text
+        try:
+            db.drop_all()
+            # PostgreSQL keeps enum types after drop_all — remove them manually
+            for enum_name in ['userrole', 'outpassstatus', 'approvaldecision']:
+                db.session.execute(text(f"DROP TYPE IF EXISTS {enum_name} CASCADE"))
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"[WARN] Drop cleanup: {e}")
+
         db.create_all()
+        print("[OK] Tables created successfully.")
 
         now = datetime.now(timezone.utc)
 
