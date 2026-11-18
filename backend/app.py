@@ -980,6 +980,32 @@ def admin_register_staff():
     return jsonify(result), 201
 
 
+# -- Seed Endpoint (runs seed.py as separate process to avoid circular imports) --
+
+@app.route("/seed-database", methods=["GET"])
+def seed_database():
+    """Visit this URL in browser to populate the database with sample data."""
+    if User.query.first() is not None:
+        return jsonify({"message": "Database already has data. Seed skipped."}), 200
+
+    import subprocess
+    result = subprocess.run(
+        ["python", "seed.py"],
+        capture_output=True, text=True, timeout=120
+    )
+    if result.returncode == 0:
+        return jsonify({
+            "message": "Database seeded successfully!",
+            "output": result.stdout[-500:] if result.stdout else ""
+        }), 200
+    else:
+        return jsonify({
+            "error": "Seed failed",
+            "stdout": result.stdout[-500:] if result.stdout else "",
+            "stderr": result.stderr[-500:] if result.stderr else ""
+        }), 500
+
+
 # -- Entrypoint ----------------------------------------------------------------
 
 if __name__ == "__main__":
