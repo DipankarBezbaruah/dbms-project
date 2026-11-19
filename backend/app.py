@@ -1082,6 +1082,71 @@ def admin_register_staff():
     return jsonify(result), 201
 
 
+# -- Admin: Remove any user ----------------------------------------------------
+
+@app.route("/admin/remove-user/<int:user_id>", methods=["DELETE"])
+def admin_remove_user(user_id):
+    """
+    Admin can remove any user (Warden, Mentor, HOD, Security, Admin, Student).
+    Cascades through all related records.
+    """
+    data = request.get_json(force=True)
+    caller_user_id = data.get("caller_user_id")
+    if not caller_user_id:
+        return jsonify({"error": "caller_user_id is required"}), 400
+
+    caller = db.session.get(User, caller_user_id)
+    if not caller or caller.role != UserRole.Admin:
+        return jsonify({"error": "Only Admins can remove users"}), 403
+
+    if user_id == caller_user_id:
+        return jsonify({"error": "You cannot remove yourself"}), 400
+
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    user_name = user.name
+    user_role = user.role.value
+
+    # Delete role-specific records and cascades
+    if user.student:
+        for op in user.student.outpasses:
+            if op.gate_log:
+                db.session.delete(op.gate_log)
+            for a in op.approvals:
+                db.session.delete(a)
+            db.session.delete(op)
+        db.session.delete(user.student)
+
+    if user.warden:
+        # Unassign hostels before deleting warden
+        for h in user.warden.hostels:
+            h.warden_id = None
+        db.session.flush()
+        db.session.delete(user.warden)
+
+    if user.mentor:
+        # Unassign students from this mentor
+        for s in user.mentor.students:
+            s.mentor_id = None
+        db.session.flush()
+        db.session.delete(user.mentor)
+
+    if user.hod:
+        db.session.delete(user.hod)
+
+    if user.security_staff:
+        db.session.delete(user.security_staff)
+
+    # Delete any approvals made by this user
+    Approval.query.filter_by(approved_by=user_id).delete()
+
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({"message": f"{user_role} '{user_name}' removed successfully"}), 200
+
+
 # -- Seed & Debug Endpoints ----------------------------------------------------
 
 @app.route("/debug-db", methods=["GET"])

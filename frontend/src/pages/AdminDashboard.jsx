@@ -350,66 +350,85 @@ function RegisterStudent({ userId }) {
   );
 }
 
-/* ── Manage Students (list + remove) ────────────── */
-function ManageStudents({ userId }) {
-  const [students, setStudents] = useState([]);
+/* ── Manage Users (list + remove all roles) ──────── */
+function ManageUsers({ userId }) {
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
   const [removing, setRemoving] = useState({});
   const [msg, setMsg] = useState(null);
   const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('All');
 
-  const fetchStudents = () => {
+  const fetchUsers = () => {
     setLoading(true);
-    api.getStudents()
-      .then(setStudents)
+    api.getUsers()
+      .then(setUsers)
       .catch((e) => setErr(e.message))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchStudents(); }, []);
+  useEffect(() => { fetchUsers(); }, []);
 
-  const handleRemove = async (studentId, studentName) => {
-    if (!window.confirm(`Are you sure you want to remove "${studentName}"? This will delete all their outpass records too.`)) return;
-    setRemoving(prev => ({ ...prev, [studentId]: true }));
+  const handleRemove = async (uid, name, role) => {
+    if (uid === userId) { alert("You cannot remove yourself."); return; }
+    if (!window.confirm(`Remove ${role} "${name}"? This will delete all their related records.`)) return;
+    setRemoving(prev => ({ ...prev, [uid]: true }));
     setMsg(null);
     try {
-      await api.removeStudent(studentId, userId);
-      setMsg({ type: 'success', text: `✅ "${studentName}" removed successfully.` });
-      fetchStudents();
+      await api.removeUser(uid, userId);
+      setMsg({ type: 'success', text: `✅ ${role} "${name}" removed successfully.` });
+      fetchUsers();
     } catch (e) {
       setMsg({ type: 'error', text: e.message });
     } finally {
-      setRemoving(prev => ({ ...prev, [studentId]: false }));
+      setRemoving(prev => ({ ...prev, [uid]: false }));
     }
   };
 
-  const filtered = students.filter(s =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.roll_no.toLowerCase().includes(search.toLowerCase()) ||
-    s.email.toLowerCase().includes(search.toLowerCase()) ||
-    (s.department || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = users.filter(u => {
+    const matchesSearch = u.name.toLowerCase().includes(search.toLowerCase()) ||
+      u.email.toLowerCase().includes(search.toLowerCase()) ||
+      u.role.toLowerCase().includes(search.toLowerCase());
+    const matchesRole = roleFilter === 'All' || u.role === roleFilter;
+    return matchesSearch && matchesRole;
+  });
+
+  const roleCounts = {};
+  users.forEach(u => { roleCounts[u.role] = (roleCounts[u.role] || 0) + 1; });
+
+  const roleColors = {
+    Admin: '#6d4c41', Warden: '#e65100', Mentor: '#2e7d32',
+    HOD: '#1565c0', Student: '#6a1b9a', Security: '#455a64',
+  };
 
   return (
     <div className="admin-content">
       <div className="admin-form-container">
         <div className="admin-section-header">
-          <span className="admin-section-title">MANAGE STUDENTS</span>
-          <span className="admin-section-hint">{students.length} students registered</span>
+          <span className="admin-section-title">MANAGE ALL USERS</span>
+          <span className="admin-section-hint">{users.length} total users</span>
         </div>
 
         {msg && (
-          <div className={`alert alert--${msg.type}`} style={{ marginBottom: 16 }}>
-            {msg.text}
-          </div>
+          <div className={`alert alert--${msg.type}`} style={{ marginBottom: 16 }}>{msg.text}</div>
         )}
 
-        <input
-          type="text"
-          placeholder="Search by name, roll no, email, or department..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+        {/* Role filter pills */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+          {['All', 'Admin', 'Warden', 'Mentor', 'HOD', 'Student', 'Security'].map(r => (
+            <button key={r} onClick={() => setRoleFilter(r)} style={{
+              padding: '4px 14px', fontSize: 13, border: 'none', borderRadius: 20, cursor: 'pointer',
+              background: roleFilter === r ? (roleColors[r] || '#333') : '#f0ebe4',
+              color: roleFilter === r ? '#fff' : '#555', fontWeight: roleFilter === r ? 600 : 400,
+            }}>
+              {r} {r !== 'All' && roleCounts[r] ? `(${roleCounts[r]})` : r === 'All' ? `(${users.length})` : ''}
+            </button>
+          ))}
+        </div>
+
+        <input type="text" placeholder="Search by name, email, or role..."
+          value={search} onChange={(e) => setSearch(e.target.value)}
           style={{
             width: '100%', padding: '10px 14px', marginBottom: 16,
             border: '1px solid var(--brown-200, #d4c5b0)', borderRadius: 8,
@@ -424,36 +443,41 @@ function ManageStudents({ userId }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--brown-200, #d4c5b0)', textAlign: 'left' }}>
+                <th style={{ padding: '8px 12px' }}>ID</th>
                 <th style={{ padding: '8px 12px' }}>Name</th>
-                <th style={{ padding: '8px 12px' }}>Roll No</th>
                 <th style={{ padding: '8px 12px' }}>Email</th>
-                <th style={{ padding: '8px 12px' }}>Dept</th>
-                <th style={{ padding: '8px 12px' }}>Hostel</th>
-                <th style={{ padding: '8px 12px' }}>Room</th>
+                <th style={{ padding: '8px 12px' }}>Role</th>
                 <th style={{ padding: '8px 12px' }}>Action</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map(s => (
-                <tr key={s.student_id} style={{ borderBottom: '1px solid var(--brown-100, #ede4d8)' }}>
-                  <td style={{ padding: '8px 12px', fontWeight: 500 }}>{s.name}</td>
-                  <td style={{ padding: '8px 12px' }}>{s.roll_no}</td>
-                  <td style={{ padding: '8px 12px', fontSize: 13, color: '#666' }}>{s.email}</td>
-                  <td style={{ padding: '8px 12px' }}>{s.department}</td>
-                  <td style={{ padding: '8px 12px' }}>{s.hostel_name}</td>
-                  <td style={{ padding: '8px 12px' }}>{s.room_no}</td>
+              {filtered.map(u => (
+                <tr key={u.user_id} style={{ borderBottom: '1px solid var(--brown-100, #ede4d8)' }}>
+                  <td style={{ padding: '8px 12px', color: '#999' }}>{u.user_id}</td>
+                  <td style={{ padding: '8px 12px', fontWeight: 500 }}>{u.name}</td>
+                  <td style={{ padding: '8px 12px', fontSize: 13, color: '#666' }}>{u.email}</td>
                   <td style={{ padding: '8px 12px' }}>
-                    <button
-                      onClick={() => handleRemove(s.student_id, s.name)}
-                      disabled={removing[s.student_id]}
-                      style={{
-                        padding: '4px 12px', fontSize: 13, cursor: 'pointer',
-                        background: '#d32f2f', color: '#fff', border: 'none',
-                        borderRadius: 6, opacity: removing[s.student_id] ? 0.5 : 1,
-                      }}
-                    >
-                      {removing[s.student_id] ? 'Removing...' : 'Remove'}
-                    </button>
+                    <span style={{
+                      padding: '2px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600,
+                      background: roleColors[u.role] || '#666', color: '#fff',
+                    }}>{u.role}</span>
+                  </td>
+                  <td style={{ padding: '8px 12px' }}>
+                    {u.user_id === userId ? (
+                      <span style={{ color: '#999', fontSize: 13 }}>You</span>
+                    ) : (
+                      <button
+                        onClick={() => handleRemove(u.user_id, u.name, u.role)}
+                        disabled={removing[u.user_id]}
+                        style={{
+                          padding: '4px 12px', fontSize: 13, cursor: 'pointer',
+                          background: '#d32f2f', color: '#fff', border: 'none',
+                          borderRadius: 6, opacity: removing[u.user_id] ? 0.5 : 1,
+                        }}
+                      >
+                        {removing[u.user_id] ? 'Removing...' : 'Remove'}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -461,7 +485,7 @@ function ManageStudents({ userId }) {
           </table>
           {!loading && filtered.length === 0 && (
             <div style={{ textAlign: 'center', padding: 24, color: '#999' }}>
-              {search ? 'No students match your search.' : 'No students registered yet.'}
+              {search || roleFilter !== 'All' ? 'No users match your filter.' : 'No users found.'}
             </div>
           )}
         </div>
@@ -477,7 +501,7 @@ export default function AdminDashboard() {
   const sidebarNav = [
     { path: '', label: 'Register Staff', icon: IconUserPlus },
     { path: '/student', label: 'Register Student', icon: IconStudent },
-    { path: '/manage', label: 'Manage Students', icon: IconList },
+    { path: '/manage', label: 'Manage Users', icon: IconList },
   ];
 
   const subNavItems = [
@@ -502,7 +526,7 @@ export default function AdminDashboard() {
     },
     {
       path: '/manage',
-      label: 'Manage Students',
+      label: 'Manage Users',
       icon: (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
@@ -534,7 +558,7 @@ export default function AdminDashboard() {
             <Routes>
               <Route path="/" element={<RegisterStaff userId={user?.user_id} />} />
               <Route path="/student" element={<RegisterStudent userId={user?.user_id} />} />
-              <Route path="/manage" element={<ManageStudents userId={user?.user_id} />} />
+              <Route path="/manage" element={<ManageUsers userId={user?.user_id} />} />
               <Route path="*" element={<Navigate to="/admin" replace />} />
             </Routes>
           </div>
