@@ -333,6 +333,88 @@ def admin_register_student():
     }), 201
 
 
+# -- Admin: Remove a student ---------------------------------------------------
+
+@app.route("/admin/remove-student/<int:student_id>", methods=["DELETE"])
+def admin_remove_student(student_id):
+    """
+    Warden, HOD, or Admin can remove a student.
+    Deletes the student record, their outpasses, approvals, gate logs, and user account.
+    """
+    data = request.get_json(force=True)
+    caller_user_id = data.get("caller_user_id")
+    if not caller_user_id:
+        return jsonify({"error": "caller_user_id is required"}), 400
+
+    caller = db.session.get(User, caller_user_id)
+    if not caller or caller.role not in {UserRole.Warden, UserRole.HOD, UserRole.Admin}:
+        return jsonify({"error": "Only Wardens, HODs, or Admins can remove students"}), 403
+
+    student = db.session.get(Student, student_id)
+    if not student:
+        return jsonify({"error": "Student not found"}), 404
+
+    student_name = student.name
+    user_id = student.user_id
+
+    # Delete related records: gate_logs -> approvals -> outpasses -> student -> user
+    for op in student.outpasses:
+        if op.gate_log:
+            db.session.delete(op.gate_log)
+        for a in op.approvals:
+            db.session.delete(a)
+        db.session.delete(op)
+
+    db.session.delete(student)
+
+    # Delete the user account too
+    user = db.session.get(User, user_id)
+    if user:
+        db.session.delete(user)
+
+    db.session.commit()
+    return jsonify({"message": f"Student '{student_name}' removed successfully"}), 200
+
+
+# -- Admin: List all students --------------------------------------------------
+
+@app.route("/admin/students", methods=["GET"])
+def admin_list_students():
+    """List all students (for admin/warden management)."""
+    students = Student.query.order_by(Student.student_id.desc()).all()
+    return jsonify([
+        {
+            "student_id": s.student_id,
+            "user_id": s.user_id,
+            "name": s.name,
+            "email": s.user.email,
+            "roll_no": s.roll_no,
+            "department": s.department,
+            "hostel_name": s.hostel.hostel_name if s.hostel else None,
+            "room_no": s.room.room_no if s.room else None,
+            "mentor_name": s.mentor.user.name if s.mentor else None,
+        }
+        for s in students
+    ]), 200
+
+
+# -- Admin: List all users -----------------------------------------------------
+
+@app.route("/admin/users", methods=["GET"])
+def admin_list_users():
+    """List all users (for admin dashboard)."""
+    users = User.query.order_by(User.user_id.desc()).all()
+    return jsonify([
+        {
+            "user_id": u.user_id,
+            "email": u.email,
+            "name": u.name,
+            "role": u.role.value,
+        }
+        for u in users
+    ]), 200
+
+
 # -- Outpass Routes ------------------------------------------------------------
 
 @app.route("/outpasses", methods=["POST"])
@@ -662,6 +744,27 @@ def log_exit(outpass_id):
     if outpass.gate_log:
         return jsonify({"error": "Exit already logged for this outpass"}), 409
 
+    # Validate: exit only allowed on or after requested departure date
+    now = _now()
+    dep = outpass.requested_departure
+    if dep.tzinfo is None:
+        dep = dep.replace(tzinfo=timezone.utc)
+    if now.date() < dep.date():
+        return jsonify({
+            "error": f"Cannot log exit before the departure date. "
+                     f"Outpass is valid from {dep.strftime('%d %b %Y')}."
+        }), 400
+
+    # Also reject if return date has already passed
+    ret = outpass.requested_return
+    if ret.tzinfo is None:
+        ret = ret.replace(tzinfo=timezone.utc)
+    if now.date() > ret.date():
+        return jsonify({
+            "error": f"This outpass has expired. "
+                     f"It was valid until {ret.strftime('%d %b %Y')}."
+        }), 400
+
     data = request.get_json(force=True)
     staff_id = data.get("staff_id")
     if not staff_id:
@@ -674,7 +777,7 @@ def log_exit(outpass_id):
     gate_log = GateLog(
         outpass_id=outpass_id,
         staff_id=staff_id,
-        actual_exit_time=_now(),
+        actual_exit_time=now,
     )
     db.session.add(gate_log)
     db.session.commit()
