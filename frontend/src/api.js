@@ -56,6 +56,10 @@ export const api = {
   registerStaff: (body) => request('POST', '/admin/register-staff', body),
   getHostels: () => request('GET', '/hostels'),
   getMentors: () => request('GET', '/mentors'),
+  getStudents: () => request('GET', '/admin/students'),
+  getUsers: () => request('GET', '/admin/users'),
+  removeStudent: (studentId, callerUserId) =>
+    request('DELETE', `/admin/remove-student/${studentId}`, { caller_user_id: callerUserId }),
 
   // Reports
   getOverdueReport: (hostelId) => request('GET', `/reports/overdue/${hostelId}`),

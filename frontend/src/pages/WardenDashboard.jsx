@@ -26,6 +26,13 @@ const IconUserPlus = (
     <line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/>
   </svg>
 );
+const IconList = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+    <line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/>
+    <line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+  </svg>
+);
 
 function getInitials(name) {
   return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
@@ -409,6 +416,121 @@ function RegisterStudent({ userId, hostelId }) {
   );
 }
 
+/* ── Manage Students (Warden) ───────────────────── */
+function ManageStudents({ userId }) {
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+  const [removing, setRemoving] = useState({});
+  const [msg, setMsg] = useState(null);
+  const [search, setSearch] = useState('');
+
+  const fetchStudents = () => {
+    setLoading(true);
+    api.getStudents()
+      .then(setStudents)
+      .catch((e) => setErr(e.message))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchStudents(); }, []);
+
+  const handleRemove = async (studentId, studentName) => {
+    if (!window.confirm(`Remove "${studentName}"? This deletes all their outpass records too.`)) return;
+    setRemoving(prev => ({ ...prev, [studentId]: true }));
+    setMsg(null);
+    try {
+      await api.removeStudent(studentId, userId);
+      setMsg({ type: 'success', text: `✅ "${studentName}" removed.` });
+      fetchStudents();
+    } catch (e) {
+      setMsg({ type: 'error', text: e.message });
+    } finally {
+      setRemoving(prev => ({ ...prev, [studentId]: false }));
+    }
+  };
+
+  const filtered = students.filter(s =>
+    s.name.toLowerCase().includes(search.toLowerCase()) ||
+    s.roll_no.toLowerCase().includes(search.toLowerCase()) ||
+    (s.department || '').toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="warden-content">
+      <div className="register-form-container">
+        <div className="warden-queue__header">
+          <span className="warden-queue__title">MANAGE STUDENTS</span>
+          <span className="warden-queue__count">{students.length} total</span>
+        </div>
+
+        {msg && (
+          <div className={`alert alert--${msg.type}`} style={{ marginBottom: 16 }}>{msg.text}</div>
+        )}
+
+        <input
+          type="text"
+          placeholder="Search by name, roll no, or department..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{
+            width: '100%', padding: '10px 14px', marginBottom: 16,
+            border: '1px solid var(--brown-200, #d4c5b0)', borderRadius: 8,
+            fontSize: 14, boxSizing: 'border-box',
+          }}
+        />
+
+        {loading && <div className="loading">Loading...</div>}
+        {err && <div className="alert alert--error">{err}</div>}
+
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--brown-200, #d4c5b0)', textAlign: 'left' }}>
+                <th style={{ padding: '8px 12px' }}>Name</th>
+                <th style={{ padding: '8px 12px' }}>Roll No</th>
+                <th style={{ padding: '8px 12px' }}>Dept</th>
+                <th style={{ padding: '8px 12px' }}>Hostel</th>
+                <th style={{ padding: '8px 12px' }}>Room</th>
+                <th style={{ padding: '8px 12px' }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(s => (
+                <tr key={s.student_id} style={{ borderBottom: '1px solid var(--brown-100, #ede4d8)' }}>
+                  <td style={{ padding: '8px 12px', fontWeight: 500 }}>{s.name}</td>
+                  <td style={{ padding: '8px 12px' }}>{s.roll_no}</td>
+                  <td style={{ padding: '8px 12px' }}>{s.department}</td>
+                  <td style={{ padding: '8px 12px' }}>{s.hostel_name}</td>
+                  <td style={{ padding: '8px 12px' }}>{s.room_no}</td>
+                  <td style={{ padding: '8px 12px' }}>
+                    <button
+                      onClick={() => handleRemove(s.student_id, s.name)}
+                      disabled={removing[s.student_id]}
+                      style={{
+                        padding: '4px 12px', fontSize: 13, cursor: 'pointer',
+                        background: '#d32f2f', color: '#fff', border: 'none',
+                        borderRadius: 6, opacity: removing[s.student_id] ? 0.5 : 1,
+                      }}
+                    >
+                      {removing[s.student_id] ? 'Removing...' : 'Remove'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!loading && filtered.length === 0 && (
+            <div style={{ textAlign: 'center', padding: 24, color: '#999' }}>
+              {search ? 'No students match.' : 'No students registered.'}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Dashboard shell ────────────────────────────── */
 export default function WardenDashboard() {
   const { user, logout } = useAuth();
@@ -435,6 +557,7 @@ export default function WardenDashboard() {
     { path: '', label: 'Pending Queue', icon: IconQueue, badge: pendingCount },
     { path: '/overview', label: 'Overdue', icon: IconChart, badge: overdueCount },
     { path: '/register', label: 'Register Student', icon: IconUserPlus },
+    { path: '/manage', label: 'Manage Students', icon: IconList },
   ];
 
   const subNavItems = [
@@ -470,6 +593,17 @@ export default function WardenDashboard() {
         </svg>
       ),
     },
+    {
+      path: '/manage',
+      label: 'Manage Students',
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+          <line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/>
+          <line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+        </svg>
+      ),
+    },
   ];
 
   return (
@@ -497,6 +631,7 @@ export default function WardenDashboard() {
               <Route path="/" element={<PendingQueue userId={user?.user_id} hostelId={hostelId} />} />
               <Route path="/overview" element={<Overview hostelId={hostelId} />} />
               <Route path="/register" element={<RegisterStudent userId={user?.user_id} hostelId={hostelId} />} />
+              <Route path="/manage" element={<ManageStudents userId={user?.user_id} />} />
               <Route path="*" element={<Navigate to="/warden" replace />} />
             </Routes>
           </div>

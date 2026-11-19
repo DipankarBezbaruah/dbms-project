@@ -23,6 +23,14 @@ const IconStudent = (
 const STAFF_ROLES = ['Warden', 'Mentor', 'HOD', 'Security', 'Admin'];
 const DEPARTMENTS = ['CSE', 'ECE', 'ME', 'CE', 'FET'];
 
+const IconList = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+    <line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/>
+    <line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+  </svg>
+);
+
 /* ── Register Staff Form ────────────────────────── */
 function RegisterStaff({ userId }) {
   const [hostels, setHostels] = useState([]);
@@ -342,6 +350,126 @@ function RegisterStudent({ userId }) {
   );
 }
 
+/* ── Manage Students (list + remove) ────────────── */
+function ManageStudents({ userId }) {
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+  const [removing, setRemoving] = useState({});
+  const [msg, setMsg] = useState(null);
+  const [search, setSearch] = useState('');
+
+  const fetchStudents = () => {
+    setLoading(true);
+    api.getStudents()
+      .then(setStudents)
+      .catch((e) => setErr(e.message))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchStudents(); }, []);
+
+  const handleRemove = async (studentId, studentName) => {
+    if (!window.confirm(`Are you sure you want to remove "${studentName}"? This will delete all their outpass records too.`)) return;
+    setRemoving(prev => ({ ...prev, [studentId]: true }));
+    setMsg(null);
+    try {
+      await api.removeStudent(studentId, userId);
+      setMsg({ type: 'success', text: `✅ "${studentName}" removed successfully.` });
+      fetchStudents();
+    } catch (e) {
+      setMsg({ type: 'error', text: e.message });
+    } finally {
+      setRemoving(prev => ({ ...prev, [studentId]: false }));
+    }
+  };
+
+  const filtered = students.filter(s =>
+    s.name.toLowerCase().includes(search.toLowerCase()) ||
+    s.roll_no.toLowerCase().includes(search.toLowerCase()) ||
+    s.email.toLowerCase().includes(search.toLowerCase()) ||
+    (s.department || '').toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="admin-content">
+      <div className="admin-form-container">
+        <div className="admin-section-header">
+          <span className="admin-section-title">MANAGE STUDENTS</span>
+          <span className="admin-section-hint">{students.length} students registered</span>
+        </div>
+
+        {msg && (
+          <div className={`alert alert--${msg.type}`} style={{ marginBottom: 16 }}>
+            {msg.text}
+          </div>
+        )}
+
+        <input
+          type="text"
+          placeholder="Search by name, roll no, email, or department..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{
+            width: '100%', padding: '10px 14px', marginBottom: 16,
+            border: '1px solid var(--brown-200, #d4c5b0)', borderRadius: 8,
+            fontSize: 14, boxSizing: 'border-box',
+          }}
+        />
+
+        {loading && <div className="loading">Loading...</div>}
+        {err && <div className="alert alert--error">{err}</div>}
+
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--brown-200, #d4c5b0)', textAlign: 'left' }}>
+                <th style={{ padding: '8px 12px' }}>Name</th>
+                <th style={{ padding: '8px 12px' }}>Roll No</th>
+                <th style={{ padding: '8px 12px' }}>Email</th>
+                <th style={{ padding: '8px 12px' }}>Dept</th>
+                <th style={{ padding: '8px 12px' }}>Hostel</th>
+                <th style={{ padding: '8px 12px' }}>Room</th>
+                <th style={{ padding: '8px 12px' }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(s => (
+                <tr key={s.student_id} style={{ borderBottom: '1px solid var(--brown-100, #ede4d8)' }}>
+                  <td style={{ padding: '8px 12px', fontWeight: 500 }}>{s.name}</td>
+                  <td style={{ padding: '8px 12px' }}>{s.roll_no}</td>
+                  <td style={{ padding: '8px 12px', fontSize: 13, color: '#666' }}>{s.email}</td>
+                  <td style={{ padding: '8px 12px' }}>{s.department}</td>
+                  <td style={{ padding: '8px 12px' }}>{s.hostel_name}</td>
+                  <td style={{ padding: '8px 12px' }}>{s.room_no}</td>
+                  <td style={{ padding: '8px 12px' }}>
+                    <button
+                      onClick={() => handleRemove(s.student_id, s.name)}
+                      disabled={removing[s.student_id]}
+                      style={{
+                        padding: '4px 12px', fontSize: 13, cursor: 'pointer',
+                        background: '#d32f2f', color: '#fff', border: 'none',
+                        borderRadius: 6, opacity: removing[s.student_id] ? 0.5 : 1,
+                      }}
+                    >
+                      {removing[s.student_id] ? 'Removing...' : 'Remove'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!loading && filtered.length === 0 && (
+            <div style={{ textAlign: 'center', padding: 24, color: '#999' }}>
+              {search ? 'No students match your search.' : 'No students registered yet.'}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Dashboard shell ────────────────────────────── */
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
@@ -349,6 +477,7 @@ export default function AdminDashboard() {
   const sidebarNav = [
     { path: '', label: 'Register Staff', icon: IconUserPlus },
     { path: '/student', label: 'Register Student', icon: IconStudent },
+    { path: '/manage', label: 'Manage Students', icon: IconList },
   ];
 
   const subNavItems = [
@@ -368,6 +497,17 @@ export default function AdminDashboard() {
       icon: (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 2 3 3 6 3s6-1 6-3v-5"/>
+        </svg>
+      ),
+    },
+    {
+      path: '/manage',
+      label: 'Manage Students',
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+          <line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/>
+          <line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
         </svg>
       ),
     },
@@ -394,6 +534,7 @@ export default function AdminDashboard() {
             <Routes>
               <Route path="/" element={<RegisterStaff userId={user?.user_id} />} />
               <Route path="/student" element={<RegisterStudent userId={user?.user_id} />} />
+              <Route path="/manage" element={<ManageStudents userId={user?.user_id} />} />
               <Route path="*" element={<Navigate to="/admin" replace />} />
             </Routes>
           </div>
