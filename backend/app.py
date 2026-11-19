@@ -37,10 +37,6 @@ def create_app():
 
     db.init_app(app)
 
-    # Auto-create tables on startup (no shell needed)
-    with app.app_context():
-        db.create_all()
-
     # Allow requests from your Vercel frontend
     allowed_origins = [
         "http://localhost:5173",                                        # local Vite dev
@@ -980,25 +976,57 @@ def admin_register_staff():
     return jsonify(result), 201
 
 
-# -- Seed Endpoint -------------------------------------------------------------
+# -- Seed & Debug Endpoints ----------------------------------------------------
+
+@app.route("/debug-db", methods=["GET"])
+def debug_db():
+    """Check if database connection works."""
+    import traceback
+    uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    # Mask password
+    masked = uri
+    try:
+        at_idx = uri.index("@")
+        colon_idx = uri.index(":", uri.index("://") + 3)
+        masked = uri[:colon_idx+1] + "****" + uri[at_idx:]
+    except (ValueError, IndexError):
+        pass
+
+    try:
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return jsonify({"status": "connected", "uri": masked}), 200
+    except Exception as e:
+        return jsonify({"status": "failed", "uri": masked, "error": str(e), "traceback": traceback.format_exc()}), 500
+
 
 @app.route("/seed-database", methods=["GET"])
 def seed_database():
     """Visit this URL in browser to populate the database with sample data."""
+    import traceback
+
+    # First create tables
+    try:
+        db.create_all()
+    except Exception as e:
+        return jsonify({"error": f"create_all failed: {str(e)}", "traceback": traceback.format_exc()}), 500
+
+    # Check if already seeded
     try:
         count = User.query.count()
         if count > 0:
             return jsonify({"message": f"Database already has {count} users. Seed skipped."}), 200
     except Exception as e:
-        return jsonify({"error": f"DB check failed: {str(e)}"}), 500
+        return jsonify({"error": f"DB query failed: {str(e)}", "traceback": traceback.format_exc()}), 500
 
+    # Run seed
     try:
         from seed import seed
         seed(app)
         return jsonify({"message": "Database seeded successfully!"}), 200
     except Exception as e:
-        import traceback
-        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
+        return jsonify({"error": f"Seed failed: {str(e)}", "traceback": traceback.format_exc()}), 500
 
 
 # -- Entrypoint ----------------------------------------------------------------
