@@ -1,5 +1,4 @@
 import os
-import ssl
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -13,7 +12,7 @@ class Config:
 
     _is_postgres = _raw_uri.startswith("postgres://") or _raw_uri.startswith("postgresql://")
 
-    # Fix driver prefix for Render PostgreSQL
+    # Fix driver prefix for PostgreSQL
     if _raw_uri.startswith("postgres://"):
         _raw_uri = _raw_uri.replace("postgres://", "postgresql+psycopg2://", 1)
     elif _raw_uri.startswith("postgresql://") and "+psycopg2" not in _raw_uri:
@@ -23,11 +22,15 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SECRET_KEY = os.getenv("SECRET_KEY", os.urandom(24).hex())
 
-    if _is_postgres:
+    # On Render (internal connection) = disable SSL; locally = let URL control it
+    if _is_postgres and os.getenv("RENDER"):
         SQLALCHEMY_ENGINE_OPTIONS = {
-            "connect_args": {
-                "sslmode": "disable",
-            },
+            "connect_args": {"sslmode": "disable"},
+            "pool_pre_ping": True,
+            "pool_recycle": 300,
+        }
+    elif _is_postgres:
+        SQLALCHEMY_ENGINE_OPTIONS = {
             "pool_pre_ping": True,
             "pool_recycle": 300,
         }

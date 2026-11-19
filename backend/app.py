@@ -1003,29 +1003,208 @@ def debug_db():
 
 @app.route("/seed-database", methods=["GET"])
 def seed_database():
-    """Visit this URL in browser to populate the database with sample data."""
+    """Seed the database with sample data using pre-computed password hashes.
+
+    This avoids all CPU-intensive password hashing on the server.
+    """
     import traceback
+    from sqlalchemy import text, inspect
 
-    # First create tables
+    # ---- Pre-computed password hashes (scrypt) ----
+    HASHES = {
+        "admin123":    "scrypt:32768:8:1$hSZwYc6c2H9nkZzw$c05a80d8fbc29a8a2301bc38c0bb3e5e04530fc309af141e434f650c66078a485dc86162d81df1c55ec86fc6a4bdd578d199a29cc69ad6e511c711fd5e422468",
+        "warden123":   "scrypt:32768:8:1$g2oewxLIMbUBgO0d$e805a4a86adc607a3da060d44b83c64233c0a528b539ea00f1ae81fbc2faa7175ff4e623b2b405aaa1b9e51d4a3e07cac464db517f3a6e52824ceb7fc9435acf",
+        "mentor123":   "scrypt:32768:8:1$7N3KngFDZYmFLM9q$d0314a332ba2671e58866901f146ea5ab66a793bd73dff4b99e2a2f737fd46fa9095454bce2f555769a86dc245646a420f02d7cb08c65e9835ba4759cf65d22f",
+        "hod123":      "scrypt:32768:8:1$BJb9FpagZXQ4mrRF$a1741d2cda823a32eb9c36b1a37d33cfd689dfb01d9746440a3f38d88cd5ae02dcabedf22dff289601a490fdbd4e43ec510923767249409922c00f925748a364",
+        "student123":  "scrypt:32768:8:1$GlBP0N5G3Cn6ChEf$b36fd64455c6e4e0e1533ce2fdd0c8f4189ee082005b98ceed12822a8cc1e5dcb29b5f6e09532054bf6acd1e62f7977145db05f468e46255f4a1b1c5ae23016a",
+        "security123": "scrypt:32768:8:1$L9u8eHEH7q7wveSW$a98553c9e21c65e9472c665458bdcd182d1acba43cad3cfd5d0c166bdbcca9ecf798c562d34bdff2de0e404ec077e1f30a9a693817ee6cdb2ef95ab2f92f5842",
+    }
+
     try:
+        # Step 1: Create tables
         db.create_all()
-    except Exception as e:
-        return jsonify({"error": f"create_all failed: {str(e)}", "traceback": traceback.format_exc()}), 500
 
-    # Check if already seeded
-    try:
-        count = User.query.count()
-        if count > 0:
-            return jsonify({"message": f"Database already has {count} users. Seed skipped."}), 200
-    except Exception as e:
-        return jsonify({"error": f"DB query failed: {str(e)}", "traceback": traceback.format_exc()}), 500
+        # Step 2: Check if already seeded (use a fresh connection)
+        with db.engine.connect() as conn:
+            result = conn.execute(text("SELECT count(*) FROM users"))
+            count = result.scalar()
+            if count > 0:
+                return jsonify({"message": f"Database already has {count} users. Seed skipped."}), 200
 
-    # Run seed
-    try:
-        from seed import seed
-        seed(app)
-        return jsonify({"message": "Database seeded successfully!"}), 200
+        # Step 3: Inline seed — all in one transaction, NO password hashing
+        # -------------------------------------------------------------------
+
+        # Admin
+        admin = User(email="admin@hostelout.com", role=UserRole.Admin, name="System Admin")
+        admin.password_hash = HASHES["admin123"]
+        db.session.add(admin)
+
+        # Wardens (5 user accounts)
+        warden_data = [
+            ("ramesh.kumar@gmail.com",   "Dr. Ramesh Kumar",   "9876500001"),
+            ("sunita.devi@gmail.com",    "Dr. Sunita Devi",    "9876500002"),
+            ("manoj.borah@gmail.com",    "Dr. Manoj Borah",    "9876500003"),
+            ("kalpana.nair@gmail.com",   "Dr. Kalpana Nair",   "9876500004"),
+            ("debojit.sarmah@gmail.com", "Dr. Debojit Sarmah", "9876500005"),
+        ]
+        u_wardens = []
+        for email, name, _ in warden_data:
+            u = User(email=email, role=UserRole.Warden, name=name)
+            u.password_hash = HASHES["warden123"]
+            u_wardens.append(u)
+            db.session.add(u)
+
+        # Mentors (5)
+        mentor_data = [
+            ("ananya.sharma@gmail.com",  "Dr. Ananya Sharma",  "CSE"),
+            ("vikram.singh@gmail.com",   "Dr. Vikram Singh",   "ECE"),
+            ("priyanka.das@gmail.com",   "Dr. Priyanka Das",   "ME"),
+            ("himanshu.medhi@gmail.com", "Dr. Himanshu Medhi", "CE"),
+            ("rupali.baruah@gmail.com",  "Dr. Rupali Baruah",  "FET"),
+        ]
+        u_mentors = []
+        for email, name, _ in mentor_data:
+            u = User(email=email, role=UserRole.Mentor, name=name)
+            u.password_hash = HASHES["mentor123"]
+            u_mentors.append(u)
+            db.session.add(u)
+
+        # HODs (5)
+        hod_data = [
+            ("arvind.bordoloi@gmail.com", "Prof. Arvind Bordoloi", "CSE"),
+            ("meena.patil@gmail.com",     "Prof. Meena Patil",     "ECE"),
+            ("rajiv.gogoi@gmail.com",     "Prof. Rajiv Gogoi",     "ME"),
+            ("tapan.seal@gmail.com",      "Prof. Tapan Seal",      "CE"),
+            ("nibedita.deka@gmail.com",   "Prof. Nibedita Deka",   "FET"),
+        ]
+        u_hods = []
+        for email, name, _ in hod_data:
+            u = User(email=email, role=UserRole.HOD, name=name)
+            u.password_hash = HASHES["hod123"]
+            u_hods.append(u)
+            db.session.add(u)
+
+        # Students (32)
+        student_info = [
+            ("rahul.deka@gmail.com",        "Rahul Deka",        "2023CSE001", "9000000001", "CSE", "Hostel A"),
+            ("priya.mahanta@gmail.com",     "Priya Mahanta",     "2023CSE002", "9000000002", "CSE", "Hostel B"),
+            ("ankit.sarma@gmail.com",       "Ankit Sarma",       "2023CSE003", "9000000003", "CSE", "Hostel C"),
+            ("neha.bora@gmail.com",         "Neha Bora",         "2023CSE004", "9000000004", "CSE", "Hostel D"),
+            ("rohit.kalita@gmail.com",      "Rohit Kalita",      "2023CSE005", "9000000005", "CSE", "Hostel E"),
+            ("sneha.choudhury@gmail.com",   "Sneha Choudhury",   "2023CSE006", "9000000006", "CSE", "Hostel A"),
+            ("arjun.nath@gmail.com",        "Arjun Nath",        "2023CSE007", "9000000007", "CSE", "Hostel B"),
+            ("amit.choudhury@gmail.com",    "Amit Choudhury",    "2023ECE001", "9000000008", "ECE", "Hostel C"),
+            ("kavita.rani@gmail.com",       "Kavita Rani",       "2023ECE002", "9000000009", "ECE", "Hostel D"),
+            ("deepak.nath@gmail.com",       "Deepak Nath",       "2023ECE003", "9000000010", "ECE", "Hostel E"),
+            ("ritu.kalita@gmail.com",       "Ritu Kalita",       "2023ECE004", "9000000011", "ECE", "Hostel A"),
+            ("sanjay.malakar@gmail.com",    "Sanjay Malakar",    "2023ECE005", "9000000012", "ECE", "Hostel B"),
+            ("mrinmoy.dey@gmail.com",       "Mrinmoy Dey",       "2023ECE006", "9000000013", "ECE", "Hostel C"),
+            ("pallabi.saikia@gmail.com",    "Pallabi Saikia",    "2023ECE007", "9000000014", "ECE", "Hostel D"),
+            ("suraj.hazarika@gmail.com",    "Suraj Hazarika",    "2023ME001",  "9000000015", "ME",  "Hostel E"),
+            ("pooja.das@gmail.com",         "Pooja Das",         "2023ME002",  "9000000016", "ME",  "Hostel A"),
+            ("manish.baruah@gmail.com",     "Manish Baruah",     "2023ME003",  "9000000017", "ME",  "Hostel B"),
+            ("ankita.phukan@gmail.com",     "Ankita Phukan",     "2023ME004",  "9000000018", "ME",  "Hostel C"),
+            ("bikash.medhi@gmail.com",      "Bikash Medhi",      "2023ME005",  "9000000019", "ME",  "Hostel D"),
+            ("jyoti.bhuyan@gmail.com",      "Jyoti Bhuyan",      "2023ME006",  "9000000020", "ME",  "Hostel E"),
+            ("tapash.dutta@gmail.com",      "Tapash Dutta",      "2023CE001",  "9000000021", "CE",  "Hostel A"),
+            ("monika.baishya@gmail.com",    "Monika Baishya",    "2023CE002",  "9000000022", "CE",  "Hostel B"),
+            ("kunal.rajkhowa@gmail.com",    "Kunal Rajkhowa",    "2023CE003",  "9000000023", "CE",  "Hostel C"),
+            ("pinkimoni.borah@gmail.com",   "Pinkimoni Borah",   "2023CE004",  "9000000024", "CE",  "Hostel D"),
+            ("nabajit.deka@gmail.com",      "Nabajit Deka",      "2023CE005",  "9000000025", "CE",  "Hostel E"),
+            ("barsha.kashyap@gmail.com",    "Barsha Kashyap",    "2023CE006",  "9000000026", "CE",  "Hostel A"),
+            ("diganta.gogoi@gmail.com",     "Diganta Gogoi",     "2023FET001", "9000000027", "FET", "Hostel B"),
+            ("mitali.sharma@gmail.com",     "Mitali Sharma",     "2023FET002", "9000000028", "FET", "Hostel C"),
+            ("partha.bora@gmail.com",       "Partha Bora",       "2023FET003", "9000000029", "FET", "Hostel D"),
+            ("anuradha.hazarika@gmail.com", "Anuradha Hazarika", "2023FET004", "9000000030", "FET", "Hostel E"),
+            ("hemanta.talukdar@gmail.com",  "Hemanta Talukdar",  "2023FET005", "9000000031", "FET", "Hostel A"),
+            ("kaberi.das@gmail.com",        "Kaberi Das",        "2023FET006", "9000000032", "FET", "Hostel B"),
+        ]
+        u_students = []
+        for email, name, *_ in student_info:
+            u = User(email=email, role=UserRole.Student, name=name)
+            u.password_hash = HASHES["student123"]
+            u_students.append(u)
+            db.session.add(u)
+
+        # Security (1)
+        u_security = User(email="security.desk@gmail.com", role=UserRole.Security, name="Ramu Kalita")
+        u_security.password_hash = HASHES["security123"]
+        db.session.add(u_security)
+
+        # Flush to get user_ids
+        db.session.flush()
+
+        # Mentor records
+        mentors = []
+        for u, (_, _, dept) in zip(u_mentors, mentor_data):
+            m = Mentor(user_id=u.user_id, department=dept)
+            mentors.append(m)
+            db.session.add(m)
+        db.session.flush()
+
+        # HOD records
+        for u, (_, _, dept) in zip(u_hods, hod_data):
+            db.session.add(HOD(user_id=u.user_id, department=dept))
+        db.session.flush()
+
+        # Warden records
+        wardens = []
+        for u, (_, name, contact) in zip(u_wardens, warden_data):
+            w = Warden(user_id=u.user_id, name=name, contact_no=contact)
+            wardens.append(w)
+            db.session.add(w)
+        db.session.flush()
+
+        # Hostels
+        hostel_names = ["Hostel A", "Hostel B", "Hostel C", "Hostel D", "Hostel E"]
+        hostel_objs = {}
+        for hname, w in zip(hostel_names, wardens):
+            h = Hostel(hostel_name=hname, warden_id=w.warden_id)
+            hostel_objs[hname] = h
+            db.session.add(h)
+        db.session.flush()
+
+        # Rooms (3 per hostel)
+        prefix_map = {"Hostel A": "A", "Hostel B": "B", "Hostel C": "C", "Hostel D": "D", "Hostel E": "E"}
+        rooms = {}
+        for hname, hostel in hostel_objs.items():
+            pfx = prefix_map[hname]
+            for num in ["101", "102", "103"]:
+                r = Room(hostel_id=hostel.hostel_id, room_no=f"{pfx}-{num}")
+                rooms[f"{pfx}-{num}"] = r
+                db.session.add(r)
+        db.session.flush()
+
+        # Mentor lookup by department
+        mentor_map = {}
+        for m, (_, _, dept) in zip(mentors, mentor_data):
+            mentor_map[dept] = m
+
+        # Student records
+        room_nums = ["101", "102", "103"]
+        for i, (email, name, roll_no, contact, dept, hostel_name) in enumerate(student_info):
+            pfx = prefix_map[hostel_name]
+            room_key = f"{pfx}-{room_nums[i % 3]}"
+            s = Student(
+                user_id=u_students[i].user_id,
+                name=name,
+                roll_no=roll_no,
+                room_id=rooms[room_key].room_id,
+                hostel_id=hostel_objs[hostel_name].hostel_id,
+                contact_no=contact,
+                mentor_id=mentor_map[dept].mentor_id,
+                department=dept,
+            )
+            db.session.add(s)
+
+        # Security staff record
+        db.session.add(SecurityStaff(user_id=u_security.user_id, name="Ramu Kalita", shift="Day"))
+
+        db.session.commit()
+        return jsonify({"message": "Database seeded successfully!", "users": 49}), 200
+
     except Exception as e:
+        db.session.rollback()
         return jsonify({"error": f"Seed failed: {str(e)}", "traceback": traceback.format_exc()}), 500
 
 
