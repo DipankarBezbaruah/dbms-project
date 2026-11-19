@@ -38,11 +38,14 @@ def create_app():
     db.init_app(app)
 
     # Allow requests from your Vercel frontend
+    frontend_url = os.environ.get("FRONTEND_URL", "")
     allowed_origins = [
-        "http://localhost:5173",                                        # local Vite dev
-        "http://localhost:5000",                                        # local Flask dev
-        os.environ.get("FRONTEND_URL", "http://localhost:5173"),        # production
+        "http://localhost:5173",
+        "http://localhost:5000",
+        "https://dbms-project-seven-orcin.vercel.app",
     ]
+    if frontend_url and frontend_url not in allowed_origins:
+        allowed_origins.append(frontend_url)
     CORS(app, supports_credentials=True, origins=allowed_origins)
     return app
 
