@@ -389,7 +389,9 @@ function ManageUsers({ userId }) {
   const filtered = users.filter(u => {
     const matchesSearch = u.name.toLowerCase().includes(search.toLowerCase()) ||
       u.email.toLowerCase().includes(search.toLowerCase()) ||
-      u.role.toLowerCase().includes(search.toLowerCase());
+      u.role.toLowerCase().includes(search.toLowerCase()) ||
+      (u.detail || '').toLowerCase().includes(search.toLowerCase()) ||
+      (u.roll_no || '').toLowerCase().includes(search.toLowerCase());
     const matchesRole = roleFilter === 'All' || u.role === roleFilter;
     return matchesSearch && matchesRole;
   });
@@ -447,6 +449,7 @@ function ManageUsers({ userId }) {
                 <th style={{ padding: '8px 12px' }}>Name</th>
                 <th style={{ padding: '8px 12px' }}>Email</th>
                 <th style={{ padding: '8px 12px' }}>Role</th>
+                <th style={{ padding: '8px 12px' }}>Details</th>
                 <th style={{ padding: '8px 12px' }}>Action</th>
               </tr>
             </thead>
@@ -454,13 +457,19 @@ function ManageUsers({ userId }) {
               {filtered.map(u => (
                 <tr key={u.user_id} style={{ borderBottom: '1px solid var(--brown-100, #ede4d8)' }}>
                   <td style={{ padding: '8px 12px', color: '#999' }}>{u.user_id}</td>
-                  <td style={{ padding: '8px 12px', fontWeight: 500 }}>{u.name}</td>
+                  <td style={{ padding: '8px 12px', fontWeight: 500 }}>
+                    {u.name}
+                    {u.roll_no && <div style={{ fontSize: 12, color: '#888', fontWeight: 400 }}>{u.roll_no}</div>}
+                  </td>
                   <td style={{ padding: '8px 12px', fontSize: 13, color: '#666' }}>{u.email}</td>
                   <td style={{ padding: '8px 12px' }}>
                     <span style={{
                       padding: '2px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600,
                       background: roleColors[u.role] || '#666', color: '#fff',
                     }}>{u.role}</span>
+                  </td>
+                  <td style={{ padding: '8px 12px', fontSize: 13, color: '#555' }}>
+                    {u.detail || '—'}
                   </td>
                   <td style={{ padding: '8px 12px' }}>
                     {u.user_id === userId ? (

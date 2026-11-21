@@ -402,17 +402,39 @@ def admin_list_students():
 
 @app.route("/admin/users", methods=["GET"])
 def admin_list_users():
-    """List all users (for admin dashboard)."""
+    """List all users with role-specific details (for admin dashboard)."""
     users = User.query.order_by(User.user_id.desc()).all()
-    return jsonify([
-        {
+    result = []
+    for u in users:
+        row = {
             "user_id": u.user_id,
             "email": u.email,
             "name": u.name,
             "role": u.role.value,
+            "detail": "",
         }
-        for u in users
-    ]), 200
+        if u.role == UserRole.Warden and u.warden:
+            hostels = [h.hostel_name for h in u.warden.hostels]
+            row["detail"] = ", ".join(hostels) if hostels else "No hostel assigned"
+            row["contact_no"] = u.warden.contact_no
+        elif u.role == UserRole.Mentor and u.mentor:
+            row["detail"] = u.mentor.department
+        elif u.role == UserRole.HOD and u.hod:
+            row["detail"] = u.hod.department
+        elif u.role == UserRole.Student and u.student:
+            parts = []
+            if u.student.department:
+                parts.append(u.student.department)
+            if u.student.hostel:
+                parts.append(u.student.hostel.hostel_name)
+            if u.student.room:
+                parts.append("Room " + u.student.room.room_no)
+            row["detail"] = " · ".join(parts)
+            row["roll_no"] = u.student.roll_no
+        elif u.role == UserRole.Security and u.security_staff:
+            row["detail"] = u.security_staff.shift + " shift"
+        result.append(row)
+    return jsonify(result), 200
 
 
 # -- Outpass Routes ------------------------------------------------------------
