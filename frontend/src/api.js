@@ -59,9 +59,9 @@ export const api = {
   getStudents: () => request('GET', '/admin/students'),
   getUsers: () => request('GET', '/admin/users'),
   removeStudent: (studentId, callerUserId) =>
-    request('DELETE', `/admin/remove-student/${studentId}`, { caller_user_id: callerUserId }),
+    request('POST', `/admin/remove-student/${studentId}`, { caller_user_id: callerUserId }),
   removeUser: (userId, callerUserId) =>
-    request('DELETE', `/admin/remove-user/${userId}`, { caller_user_id: callerUserId }),
+    request('POST', `/admin/remove-user/${userId}`, { caller_user_id: callerUserId }),
 
   // Reports
   getOverdueReport: (hostelId) => request('GET', `/reports/overdue/${hostelId}`),

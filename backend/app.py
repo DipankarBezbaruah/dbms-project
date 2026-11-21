@@ -335,7 +335,7 @@ def admin_register_student():
 
 # -- Admin: Remove a student ---------------------------------------------------
 
-@app.route("/admin/remove-student/<int:student_id>", methods=["DELETE"])
+@app.route("/admin/remove-student/<int:student_id>", methods=["POST"])
 def admin_remove_student(student_id):
     """
     Warden, HOD, or Admin can remove a student.
@@ -1084,7 +1084,7 @@ def admin_register_staff():
 
 # -- Admin: Remove any user ----------------------------------------------------
 
-@app.route("/admin/remove-user/<int:user_id>", methods=["DELETE"])
+@app.route("/admin/remove-user/<int:user_id>", methods=["POST"])
 def admin_remove_user(user_id):
     """
     Admin can remove any user (Warden, Mentor, HOD, Security, Admin, Student).
@@ -1120,10 +1120,13 @@ def admin_remove_user(user_id):
         db.session.delete(user.student)
 
     if user.warden:
-        # Unassign hostels before deleting warden
-        for h in user.warden.hostels:
-            h.warden_id = None
-        db.session.flush()
+        # Can't remove warden if they have hostels assigned (warden_id is NOT NULL on hostels)
+        if user.warden.hostels:
+            hostel_names = ', '.join(h.hostel_name for h in user.warden.hostels)
+            return jsonify({
+                "error": f"Cannot remove this warden — they are assigned to: {hostel_names}. "
+                         f"Please assign a different warden to those hostels first."
+            }), 400
         db.session.delete(user.warden)
 
     if user.mentor:
